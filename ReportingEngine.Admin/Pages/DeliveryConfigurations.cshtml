@@ -1,0 +1,23 @@
+@page
+@model ReportingEngine.Admin.Pages.DeliveryConfigurationsModel
+<h1>Delivery Configurations</h1>
+<div id="msg"></div>
+<div class="panel">
+  <div class="grid-2">
+    <div><label>Name</label><input id="dName" /></div>
+    <div><label>Type</label><select id="dType"><option>EMAIL</option><option>SHARED_FOLDER</option><option>SFTP</option><option>FTP</option><option>BLOB</option></select></div>
+    <div><label>DestinationReference</label><input id="dDest" value="./delivered-reports" /></div>
+    <div><label>EmailTo</label><input id="dTo" value="reports@example.com" /></div>
+    <div><label>Subject</label><input id="dSubject" value="Report {ReportCode}" /></div>
+    <div><label>Body</label><input id="dBody" value="<p>{RecordCount} records</p>" /></div>
+  </div>
+  <button onclick="createDelivery()">Create</button>
+</div>
+<div class="panel"><table><thead><tr><th>Id</th><th>Name</th><th>Type</th><th>Destination/Email</th><th>Active</th></tr></thead><tbody id="rows"></tbody></table></div>
+@section Scripts {
+<script>
+async function load(){ const items=await api.get('/api/deliveryconfigurations'); rows.innerHTML=items.map(x=>`<tr><td>${x.deliveryConfigId}</td><td>${x.deliveryName}</td><td>${x.deliveryType}</td><td>${x.emailTo||x.destinationReference||''}</td><td>${x.isActive}</td></tr>`).join(''); }
+async function createDelivery(){ try{ await api.send('/api/deliveryconfigurations','POST',{deliveryName:dName.value,deliveryType:dType.value,destinationReference:dDest.value||null,emailTo:dTo.value||null,emailCc:null,emailBcc:null,emailSubjectTemplate:dSubject.value,emailBodyTemplate:dBody.value,secretReference:null}); showMsg(msg,'Created',true); await load(); } catch(e){ showMsg(msg,e.message,false);} }
+load();
+</script>
+}

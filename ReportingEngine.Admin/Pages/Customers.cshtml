@@ -1,0 +1,31 @@
+@page
+@model ReportingEngine.Admin.Pages.CustomersModel
+<h1>Customers</h1>
+<div id="msg"></div>
+<div class="panel">
+  <h3>Create Customer</h3>
+  <div class="grid-2">
+    <div><label>Code</label><input id="code" /></div>
+    <div><label>Name</label><input id="name" /></div>
+    <div><label>TimeZoneId</label><input id="tz" value="UTC" /></div>
+  </div>
+  <button onclick="createCustomer()">Create</button>
+</div>
+<div class="panel">
+  <table><thead><tr><th>Id</th><th>Code</th><th>Name</th><th>TZ</th><th>Active</th></tr></thead><tbody id="rows"></tbody></table>
+</div>
+@section Scripts {
+<script>
+async function load() {
+  const items = await api.get('/api/customers');
+  rows.innerHTML = items.map(x => `<tr><td>${x.customerId}</td><td>${x.customerCode}</td><td>${x.customerName}</td><td>${x.timeZoneId||''}</td><td>${x.isActive}</td></tr>`).join('');
+}
+async function createCustomer() {
+  try {
+    await api.send('/api/customers','POST',{ customerCode: code.value, customerName: name.value, timeZoneId: tz.value });
+    showMsg(msg,'Created',true); await load();
+  } catch(e) { showMsg(msg,e.message,false); }
+}
+load();
+</script>
+}

@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ReportingEngine Admin</title>
+    <link rel="stylesheet" href="/css/site.css" />
+</head>
+<body>
+    <header class="topbar">
+        <div class="brand">ReportingEngine</div>
+        <nav>
+            <a href="/Dashboard">Dashboard</a>
+            <a href="/Customers">Customers</a>
+            <a href="/DataSources">Data Sources</a>
+            <a href="/Schedules">Schedules</a>
+            <a href="/FileConfigurations">File Configs</a>
+            <a href="/DeliveryConfigurations">Delivery</a>
+            <a href="/Reports">Reports</a>
+            <a href="/Executions">Executions</a>
+            <a href="/swagger" target="_blank">Swagger</a>
+            <a href="/hangfire" target="_blank">Hangfire</a>
+        </nav>
+    </header>
+    <main class="container">
+        @RenderBody()
+    </main>
+    <script src="/js/api.js"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

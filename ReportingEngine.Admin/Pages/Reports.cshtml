@@ -1,0 +1,87 @@
+@page
+@model ReportingEngine.Admin.Pages.ReportsModel
+<h1>Reports</h1>
+<div id="msg"></div>
+<div class="panel">
+  <h3>Create / Edit Report</h3>
+  <div class="grid-2">
+    <div><label>ReportId (edit)</label><input id="rId" /></div>
+    <div><label>CustomerId</label><input id="rCustomer" type="number" /></div>
+    <div><label>ReportCode</label><input id="rCode" /></div>
+    <div><label>ReportName</label><input id="rName" /></div>
+    <div><label>DataSourceId</label><input id="rDs" type="number" /></div>
+    <div><label>ScheduleId</label><input id="rSched" type="number" /></div>
+    <div><label>FileConfigId</label><input id="rFile" type="number" /></div>
+    <div><label>DeliveryConfigId</label><input id="rDel" type="number" /></div>
+  </div>
+  <label>QueryText</label>
+  <textarea id="rQuery" rows="5">SELECT CAST(1 AS INT) AS Id, 'Demo' AS Name</textarea>
+  <label>Parameters JSON</label>
+  <textarea id="rParams" rows="3">[{"parameterName":"CurrentExecution","parameterType":"DATETIME","parameterValue":null,"valueSource":"CURRENT_EXECUTION"}]</textarea>
+  <button onclick="createReport()">Create</button>
+  <button class="secondary" onclick="updateReport()">Update</button>
+</div>
+<div class="panel">
+  <table>
+    <thead><tr><th>Id</th><th>Code</th><th>Name</th><th>Status</th><th>Actions</th></tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+</div>
+<div class="panel">
+  <h3>Execution History</h3>
+  <label>ReportId</label><input id="histId" type="number" />
+  <button onclick="loadHistory()">Load</button>
+  <table><thead><tr><th>ExecutionId</th><th>Status</th><th>Started</th><th>Completed</th><th>Records</th><th>Files</th><th>Error</th></tr></thead><tbody id="hist"></tbody></table>
+</div>
+@section Scripts {
+<script>
+async function load(){
+  const items=await api.get('/api/reports');
+  rows.innerHTML=items.map(x=>`<tr>
+    <td>${x.reportId}</td><td>${x.reportCode}</td><td>${x.reportName}</td><td>${x.status}</td>
+    <td>
+      <button onclick="act(${x.reportId},'activate')">Activate</button>
+      <button class="secondary" onclick="act(${x.reportId},'pause')">Pause</button>
+      <button class="secondary" onclick="act(${x.reportId},'resume')">Resume</button>
+      <button onclick="act(${x.reportId},'run')">Run Now</button>
+      <button class="secondary" onclick="edit(${x.reportId})">Edit</button>
+    </td></tr>`).join('');
+}
+function parseParams(){ return JSON.parse(rParams.value||'[]'); }
+async function createReport(){
+  try{
+    await api.send('/api/reports','POST',{
+      customerId:Number(rCustomer.value), reportCode:rCode.value, reportName:rName.value,
+      dataSourceId:Number(rDs.value), scheduleId:Number(rSched.value), fileConfigId:Number(rFile.value),
+      deliveryConfigId:Number(rDel.value), queryText:rQuery.value, description:null, parameters:parseParams()
+    });
+    showMsg(msg,'Created',true); await load();
+  }catch(e){ showMsg(msg,e.message,false); }
+}
+async function updateReport(){
+  try{
+    await api.send('/api/reports/'+rId.value,'PUT',{
+      reportName:rName.value, dataSourceId:Number(rDs.value), scheduleId:Number(rSched.value),
+      fileConfigId:Number(rFile.value), deliveryConfigId:Number(rDel.value), queryText:rQuery.value,
+      description:null, parameters:parseParams()
+    });
+    showMsg(msg,'Updated',true); await load();
+  }catch(e){ showMsg(msg,e.message,false); }
+}
+async function act(id, action){
+  try{ await api.send(`/api/reports/${id}/${action}`,'POST'); showMsg(msg, action+' OK', true); await load(); }
+  catch(e){ showMsg(msg,e.message,false); }
+}
+async function edit(id){
+  const x=await api.get('/api/reports/'+id);
+  rId.value=x.reportId; rCustomer.value=x.customerId; rCode.value=x.reportCode; rName.value=x.reportName;
+  rDs.value=x.dataSourceId; rSched.value=x.scheduleId; rFile.value=x.fileConfigId; rDel.value=x.deliveryConfigId;
+  rQuery.value=x.queryText; rParams.value=JSON.stringify(x.parameters,null,2); histId.value=id;
+}
+async function loadHistory(){
+  const items=await api.get('/api/reports/'+histId.value+'/executions');
+  hist.innerHTML=items.map(x=>`<tr><td>${x.executionId}</td><td>${x.status}</td><td>${x.startedAt||''}</td><td>${x.completedAt||''}</td><td>${x.recordCount??''}</td><td>${x.fileCount??''}</td><td>${x.errorMessage||''}</td></tr>`).join('');
+}
+load();
+</script>
+}

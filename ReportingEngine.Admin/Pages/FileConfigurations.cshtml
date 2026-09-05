@@ -1,0 +1,23 @@
+@page
+@model ReportingEngine.Admin.Pages.FileConfigurationsModel
+<h1>File Configurations</h1>
+<div id="msg"></div>
+<div class="panel">
+  <div class="grid-2">
+    <div><label>Name</label><input id="fName" /></div>
+    <div><label>Format</label><select id="fFormat"><option>CSV</option><option>JSON</option><option>TXT</option><option>EXCEL</option><option>XML</option></select></div>
+    <div><label>FileNamePattern</label><input id="fPattern" value="Report_{CustomerCode}_{yyyyMMdd}_{Sequence}.csv" /></div>
+    <div><label>SplitEnabled</label><select id="fSplit"><option value="false">false</option><option value="true">true</option></select></div>
+    <div><label>SplitType</label><select id="fSplitType"><option value="">(none)</option><option>RECORD_COUNT</option><option>FILE_SIZE</option></select></div>
+    <div><label>SplitValue</label><input id="fSplitValue" type="number" /></div>
+  </div>
+  <button onclick="createFile()">Create</button>
+</div>
+<div class="panel"><table><thead><tr><th>Id</th><th>Name</th><th>Format</th><th>Pattern</th><th>Split</th></tr></thead><tbody id="rows"></tbody></table></div>
+@section Scripts {
+<script>
+async function load(){ const items=await api.get('/api/fileconfigurations'); rows.innerHTML=items.map(x=>`<tr><td>${x.fileConfigId}</td><td>${x.configurationName}</td><td>${x.fileFormat}</td><td>${x.fileNamePattern}</td><td>${x.splitEnabled? x.splitType+'/'+x.splitValue:''}</td></tr>`).join(''); }
+async function createFile(){ try{ await api.send('/api/fileconfigurations','POST',{configurationName:fName.value,fileFormat:fFormat.value,fileNamePattern:fPattern.value,splitEnabled:fSplit.value==='true',splitType:fSplitType.value||null,splitValue:fSplitValue.value?Number(fSplitValue.value):null,compressionType:null,encryptionEnabled:false}); showMsg(msg,'Created',true); await load(); } catch(e){ showMsg(msg,e.message,false);} }
+load();
+</script>
+}

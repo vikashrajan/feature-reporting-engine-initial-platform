@@ -1,0 +1,8 @@
+<Solution>
+  <Project Path="ReportingEngine.Admin/ReportingEngine.Admin.csproj" />
+  <Project Path="ReportingEngine.Application/ReportingEngine.Application.csproj" />
+  <Project Path="ReportingEngine.Domain/ReportingEngine.Domain.csproj" />
+  <Project Path="ReportingEngine.Infrastructure/ReportingEngine.Infrastructure.csproj" />
+  <Project Path="ReportingEngine.Tests/ReportingEngine.Tests.csproj" />
+  <Project Path="ReportingEngine.Worker/ReportingEngine.Worker.csproj" />
+</Solution>

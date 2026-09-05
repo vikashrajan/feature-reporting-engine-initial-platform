@@ -1,0 +1,19 @@
+@page
+@model ReportingEngine.Admin.Pages.ExecutionsModel
+<h1>Executions</h1>
+<div id="msg"></div>
+<div class="panel">
+  <label>ExecutionId</label>
+  <input id="eId" type="number" />
+  <button onclick="loadOne()">Load</button>
+  <button onclick="retryOne()">Retry</button>
+  <button class="danger" onclick="cancelOne()">Cancel</button>
+  <pre id="detail"></pre>
+</div>
+@section Scripts {
+<script>
+async function loadOne(){ try{ const x=await api.get('/api/executions/'+eId.value); detail.textContent=JSON.stringify(x,null,2); showMsg(msg,'Loaded',true);} catch(e){ showMsg(msg,e.message,false);} }
+async function retryOne(){ try{ await api.send('/api/executions/'+eId.value+'/retry','POST'); showMsg(msg,'Retry queued',true);} catch(e){ showMsg(msg,e.message,false);} }
+async function cancelOne(){ try{ await api.send('/api/executions/'+eId.value+'/cancel','POST'); showMsg(msg,'Cancelled',true);} catch(e){ showMsg(msg,e.message,false);} }
+</script>
+}

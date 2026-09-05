@@ -1,0 +1,20 @@
+@page
+@model ReportingEngine.Admin.Pages.DataSourcesModel
+<h1>Data Sources</h1>
+<div id="msg"></div>
+<div class="panel">
+  <div class="grid-2">
+    <div><label>Name</label><input id="dsName" /></div>
+    <div><label>Type</label><select id="dsType"><option>SQL</option><option>COSMOS</option><option>POSTGRES</option><option>ORACLE</option><option>API</option></select></div>
+    <div><label>ConnectionReference</label><input id="dsRef" value="SampleSql" /></div>
+  </div>
+  <button onclick="createDs()">Create</button>
+</div>
+<div class="panel"><table><thead><tr><th>Id</th><th>Name</th><th>Type</th><th>Reference</th><th>Active</th></tr></thead><tbody id="rows"></tbody></table></div>
+@section Scripts {
+<script>
+async function load(){ const items=await api.get('/api/datasources'); rows.innerHTML=items.map(x=>`<tr><td>${x.dataSourceId}</td><td>${x.dataSourceName}</td><td>${x.dataSourceType}</td><td>${x.connectionReference}</td><td>${x.isActive}</td></tr>`).join(''); }
+async function createDs(){ try{ await api.send('/api/datasources','POST',{dataSourceName:dsName.value,dataSourceType:dsType.value,connectionReference:dsRef.value}); showMsg(msg,'Created',true); await load(); } catch(e){ showMsg(msg,e.message,false);} }
+load();
+</script>
+}

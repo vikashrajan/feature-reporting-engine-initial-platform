@@ -1,0 +1,36 @@
+## .NET
+bin/
+obj/
+*.user
+*.suo
+*.user.user
+*.rsuser
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Aa]rtifacts/
+
+## Local runtime outputs
+temp-reports/
+temp-emails/
+delivered-reports/
+*.log
+
+## IDE / OS
+.vs/
+.idea/
+.vscode/
+*.usercode
+.DS_Store
+Thumbs.db
+
+## Secrets / local overrides
+appsettings.*.local.json
+secrets.json
+*.pfx
+
+## NuGet
+*.nupkg
+packages/
+project.lock.json

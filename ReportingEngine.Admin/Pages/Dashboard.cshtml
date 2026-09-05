@@ -1,0 +1,25 @@
+@page
+@model ReportingEngine.Admin.Pages.DashboardModel
+@{
+    ViewData["Title"] = "Dashboard";
+}
+<h1>Dashboard</h1>
+<div class="cards" id="cards">
+  <div class="card"><div class="label">Running</div><div class="value" id="running">-</div></div>
+  <div class="card"><div class="label">Successful (24h)</div><div class="value" id="successful">-</div></div>
+  <div class="card"><div class="label">Failed (24h)</div><div class="value" id="failed">-</div></div>
+  <div class="card"><div class="label">Upcoming (Active)</div><div class="value" id="upcoming">-</div></div>
+</div>
+<div class="panel">
+  <p>Admin configures reports. Worker + Hangfire execute them independently against the shared SQL database.</p>
+</div>
+@section Scripts {
+<script>
+api.get('/api/dashboard').then(d => {
+  running.textContent = d.runningReports;
+  successful.textContent = d.successfulReports;
+  failed.textContent = d.failedReports;
+  upcoming.textContent = d.upcomingReports;
+}).catch(e => showMsg(Object.assign(document.createElement('div'), {}), e.message, false));
+</script>
+}
