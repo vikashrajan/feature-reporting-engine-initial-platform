@@ -10,6 +10,8 @@ public class FileConfiguration
     public string? SplitType { get; set; }
     public long? SplitValue { get; set; }
     public string? CompressionType { get; set; }
+    public int? ZipBatchSize { get; set; }
+    public bool KeepLocalFiles { get; set; } = true;
     public bool EncryptionEnabled { get; set; }
     public string CreatedBy { get; set; } = string.Empty;
     public DateTime CreatedDate { get; set; }

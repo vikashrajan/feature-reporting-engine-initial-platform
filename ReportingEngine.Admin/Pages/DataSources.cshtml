@@ -3,18 +3,29 @@
 <h1>Data Sources</h1>
 <div id="msg"></div>
 <div class="panel">
+  <h3 id="formTitle">Create / Edit Data Source</h3>
   <div class="grid-2">
+    <div><label>Data Source ID (auto for Edit)</label><input id="dsId" readonly style="background:#f3f4f6;" /></div>
     <div><label>Name</label><input id="dsName" /></div>
     <div><label>Type</label><select id="dsType"><option>SQL</option><option>COSMOS</option><option>POSTGRES</option><option>ORACLE</option><option>API</option></select></div>
-    <div><label>ConnectionReference</label><input id="dsRef" value="SampleSql" /></div>
+    <div><label>Connection Reference</label><input id="dsRef" value="SampleSql" /></div>
+    <div><label>Status</label><select id="dsActive"><option value="true">Active</option><option value="false">Inactive</option></select></div>
   </div>
-  <button onclick="createDs()">Create</button>
+  <div style="margin-top:0.75rem;">
+    <button onclick="createDs()">Create Data Source</button>
+    <button class="secondary" onclick="updateDs()">Update Data Source</button>
+    <button class="secondary" onclick="resetForm()">Clear / New</button>
+  </div>
 </div>
-<div class="panel"><table><thead><tr><th>Id</th><th>Name</th><th>Type</th><th>Reference</th><th>Active</th></tr></thead><tbody id="rows"></tbody></table></div>
+<div class="panel"><table><thead><tr><th>Id</th><th>Name</th><th>Type</th><th>Reference</th><th>Active</th><th>Actions</th></tr></thead><tbody id="rows"></tbody></table></div>
 @section Scripts {
 <script>
-async function load(){ const items=await api.get('/api/datasources'); rows.innerHTML=items.map(x=>`<tr><td>${x.dataSourceId}</td><td>${x.dataSourceName}</td><td>${x.dataSourceType}</td><td>${x.connectionReference}</td><td>${x.isActive}</td></tr>`).join(''); }
-async function createDs(){ try{ await api.send('/api/datasources','POST',{dataSourceName:dsName.value,dataSourceType:dsType.value,connectionReference:dsRef.value}); showMsg(msg,'Created',true); await load(); } catch(e){ showMsg(msg,e.message,false);} }
+async function load(){ const items=await api.get('/api/datasources'); rows.innerHTML=items.map(x=>`<tr><td><strong>#${x.dataSourceId}</strong></td><td><strong>${x.dataSourceName}</strong></td><td>${x.dataSourceType}</td><td><code>${x.connectionReference}</code></td><td>${x.isActive ? 'Active' : 'Inactive'}</td><td><button class="secondary" onclick="editDs(${x.dataSourceId})">Edit</button> <button class="danger" onclick="deleteDs(${x.dataSourceId}, '${x.dataSourceName.replace(/'/g, "\\'")}')">Delete</button></td></tr>`).join(''); }
+async function createDs(){ try{ await api.send('/api/datasources','POST',{dataSourceName:dsName.value,dataSourceType:dsType.value,connectionReference:dsRef.value}); showMsg(msg,'Created',true); resetForm(); await load(); } catch(e){ showMsg(msg,e.message,false);} }
+async function updateDs(){ try{ if(!dsId.value) throw new Error('Select a data source to edit first.'); await api.send('/api/datasources/'+dsId.value,'PUT',{dataSourceName:dsName.value,dataSourceType:dsType.value,connectionReference:dsRef.value,isActive:dsActive.value==='true'}); showMsg(msg,'Updated',true); resetForm(); await load(); } catch(e){ showMsg(msg,e.message,false);} }
+async function editDs(id){ const x=await api.get('/api/datasources/'+id); dsId.value=x.dataSourceId; dsName.value=x.dataSourceName; dsType.value=x.dataSourceType; dsRef.value=x.connectionReference; dsActive.value=x.isActive?'true':'false'; formTitle.innerText='Edit Data Source #'+x.dataSourceId; window.scrollTo({top:0,behavior:'smooth'}); }
+async function deleteDs(id,label){ if(!confirm(`Delete data source "${label}"?`)) return; try{ await api.send('/api/datasources/'+id,'DELETE'); showMsg(msg,'Deleted',true); resetForm(); await load(); } catch(e){ showMsg(msg,e.message,false);} }
+function resetForm(){ dsId.value=''; dsName.value=''; dsType.value='SQL'; dsRef.value='SampleSql'; dsActive.value='true'; formTitle.innerText='Create / Edit Data Source'; }
 load();
 </script>
 }

@@ -2,30 +2,112 @@
 @model ReportingEngine.Admin.Pages.CustomersModel
 <h1>Customers</h1>
 <div id="msg"></div>
+
 <div class="panel">
-  <h3>Create Customer</h3>
+  <h3>Create / Edit Customer</h3>
   <div class="grid-2">
-    <div><label>Code</label><input id="code" /></div>
-    <div><label>Name</label><input id="name" /></div>
-    <div><label>TimeZoneId</label><input id="tz" value="UTC" /></div>
+    <div><label>Customer ID (auto for Edit)</label><input id="cId" placeholder="Leave empty for Create" readonly style="background:#f3f4f6;" /></div>
+    <div><label>Customer Code</label><input id="code" placeholder="e.g. CUST_001" /></div>
+    <div><label>Customer Name</label><input id="name" placeholder="e.g. Acme Corporation" /></div>
+    <div><label>Time Zone</label><select id="tz"><option value="UTC">UTC</option></select></div>
   </div>
-  <button onclick="createCustomer()">Create</button>
+  <div style="margin-top:0.75rem;">
+    <button onclick="createCustomer()">Create Customer</button>
+    <button class="secondary" onclick="updateCustomer()">Update Customer</button>
+    <button class="secondary" onclick="resetForm()">Clear / New</button>
+  </div>
 </div>
+
 <div class="panel">
-  <table><thead><tr><th>Id</th><th>Code</th><th>Name</th><th>TZ</th><th>Active</th></tr></thead><tbody id="rows"></tbody></table>
+  <h3>Configured Customers</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Id</th>
+        <th>Customer Code</th>
+        <th>Customer Name</th>
+        <th>Time Zone</th>
+        <th>Status</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody id="rows"></tbody>
+  </table>
 </div>
+
 @section Scripts {
 <script>
 async function load() {
+  await loadTimeZones();
   const items = await api.get('/api/customers');
-  rows.innerHTML = items.map(x => `<tr><td>${x.customerId}</td><td>${x.customerCode}</td><td>${x.customerName}</td><td>${x.timeZoneId||''}</td><td>${x.isActive}</td></tr>`).join('');
+  rows.innerHTML = items.map(x => `<tr>
+    <td><strong>#${x.customerId}</strong></td>
+    <td><code>${x.customerCode}</code></td>
+    <td><strong>${x.customerName}</strong></td>
+    <td>${x.timeZoneId || 'UTC'}</td>
+    <td>${x.isActive ? '<span style="color:var(--ok);">Active</span>' : 'Inactive'}</td>
+    <td>
+      <button class="secondary" onclick="edit(${x.customerId})">Edit</button>
+      <button class="danger" onclick="deleteCustomer(${x.customerId}, '${x.customerName.replace(/'/g, "\\'")}')">Delete</button>
+    </td>
+  </tr>`).join('');
 }
+
+async function loadTimeZones() {
+  if (tz.options.length > 1) return;
+  const zones = await api.get('/api/timezones');
+  tz.innerHTML = zones.map(z => `<option value="${z.id}">${z.displayName} (${z.id})</option>`).join('');
+  if ([...tz.options].some(o => o.value === 'India Standard Time')) tz.value = 'India Standard Time';
+  else tz.value = 'UTC';
+}
+
 async function createCustomer() {
   try {
-    await api.send('/api/customers','POST',{ customerCode: code.value, customerName: name.value, timeZoneId: tz.value });
-    showMsg(msg,'Created',true); await load();
-  } catch(e) { showMsg(msg,e.message,false); }
+    if (!code.value.trim() || !name.value.trim()) throw new Error('Customer code and customer name are required.');
+    await api.send('/api/customers', 'POST', { customerCode: code.value.trim(), customerName: name.value.trim(), timeZoneId: tz.value || 'UTC' });
+    showMsg(msg, 'Customer created successfully!', true); 
+    resetForm();
+    await load();
+  } catch(e) { showMsg(msg, e.message, false); }
 }
+
+async function updateCustomer() {
+  try {
+    if (!cId.value) throw new Error("Select a customer to edit first.");
+    if (!name.value.trim()) throw new Error('Customer name is required.');
+    await api.send('/api/customers/' + cId.value, 'PUT', { customerName: name.value.trim(), timeZoneId: tz.value || 'UTC', isActive: true });
+    showMsg(msg, 'Customer updated successfully!', true); 
+    resetForm();
+    await load();
+  } catch(e) { showMsg(msg, e.message, false); }
+}
+
+async function edit(id) {
+  await loadTimeZones();
+  const x = await api.get('/api/customers/' + id);
+  cId.value = x.customerId;
+  code.value = x.customerCode;
+  name.value = x.customerName;
+  tz.value = x.timeZoneId || 'UTC';
+}
+
+function resetForm() {
+  cId.value = '';
+  code.value = '';
+  name.value = '';
+  tz.value = 'UTC';
+}
+
+async function deleteCustomer(id, label) {
+  if (!confirm(`Delete customer "${label}"?`)) return;
+  try {
+    await api.send('/api/customers/' + id, 'DELETE');
+    showMsg(msg, 'Customer deleted successfully!', true);
+    resetForm();
+    await load();
+  } catch(e) { showMsg(msg, e.message, false); }
+}
+
 load();
 </script>
 }

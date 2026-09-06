@@ -43,6 +43,8 @@ button, .btn {
 }
 button.secondary { background: #334155; }
 button.danger { background: var(--danger); }
+.btn { display: inline-block; text-decoration: none; }
+.btn.secondary { background: #334155; }
 input, select, textarea {
   width: 100%; padding: 0.45rem 0.5rem; margin: 0.25rem 0 0.6rem;
   border: 1px solid var(--border); border-radius: 6px; font: inherit;
@@ -52,4 +54,12 @@ label { font-size: 0.85rem; color: var(--muted); }
 .msg { margin: 0.5rem 0; padding: 0.6rem 0.75rem; border-radius: 6px; }
 .msg.error { background: #fee2e2; color: var(--danger); }
 .msg.ok { background: #d1fae5; color: var(--ok); }
+.badge { display: inline-block; padding: 0.2rem 0.55rem; border-radius: 9999px; font-size: 0.78rem; font-weight: 600; text-transform: uppercase; }
+.badge.active, .badge.success { background: #d1fae5; color: #047857; }
+.badge.draft, .badge.paused { background: #fef3c7; color: #b45309; }
+.badge.running, .badge.retrying { background: #dbeafe; color: #1d4ed8; }
+.badge.failed { background: #fee2e2; color: #b91c1c; }
+.badge.email { background: #e0e7ff; color: #4338ca; }
+.badge.sftp { background: #fae8ff; color: #86198f; }
+.badge.shared_folder { background: #f3e8ff; color: #6b21a8; }
 @media (max-width: 800px) { .grid-2 { grid-template-columns: 1fr; } }

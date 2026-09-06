@@ -1,87 +1,288 @@
 @page
 @model ReportingEngine.Admin.Pages.ReportsModel
-<h1>Reports</h1>
+<h1>Reports Configuration & Scheduling</h1>
 <div id="msg"></div>
+
 <div class="panel">
-  <h3>Create / Edit Report</h3>
+  <h3>Create / Edit Report Definition</h3>
   <div class="grid-2">
-    <div><label>ReportId (edit)</label><input id="rId" /></div>
-    <div><label>CustomerId</label><input id="rCustomer" type="number" /></div>
-    <div><label>ReportCode</label><input id="rCode" /></div>
-    <div><label>ReportName</label><input id="rName" /></div>
-    <div><label>DataSourceId</label><input id="rDs" type="number" /></div>
-    <div><label>ScheduleId</label><input id="rSched" type="number" /></div>
-    <div><label>FileConfigId</label><input id="rFile" type="number" /></div>
-    <div><label>DeliveryConfigId</label><input id="rDel" type="number" /></div>
+    <div><label>Report ID (auto for Edit)</label><input id="rId" placeholder="Leave empty for Create" readonly style="background:#f3f4f6;" /></div>
+    <div><label>Customer Data</label><select id="rCustomer"><option value="">-- Select Customer --</option></select></div>
+    <div><label>Report Code</label><input id="rCode" placeholder="e.g. DAILY_SALES" /></div>
+    <div><label>Report Name</label><input id="rName" placeholder="e.g. Daily Sales Summary" /></div>
+    <div><label>Data Source</label><select id="rDs"><option value="">-- Select Data Source --</option></select></div>
+    <div><label>Execution Schedule</label><select id="rSched"><option value="">-- Select Schedule --</option></select></div>
+    <div><label>File Output Format</label><select id="rFile"><option value="">-- Select File Configuration --</option></select></div>
+    <div><label>Delivery Method</label><select id="rDel"><option value="">-- Select Delivery Method --</option></select></div>
   </div>
-  <label>QueryText</label>
-  <textarea id="rQuery" rows="5">SELECT CAST(1 AS INT) AS Id, 'Demo' AS Name</textarea>
+  
+  <label>Query Text (SQL / Cosmos Query)</label>
+  <textarea id="rQuery" rows="5">SELECT CAST(1 AS INT) AS Id, 'Demo' AS Name, GETUTCDATE() AS CreatedDate</textarea>
+  
   <label>Parameters JSON</label>
   <textarea id="rParams" rows="3">[{"parameterName":"CurrentExecution","parameterType":"DATETIME","parameterValue":null,"valueSource":"CURRENT_EXECUTION"}]</textarea>
-  <button onclick="createReport()">Create</button>
-  <button class="secondary" onclick="updateReport()">Update</button>
+  <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-top:0.5rem;">
+    <button class="secondary" type="button" onclick="setParameterPreset('incremental')">Incremental Window</button>
+    <button class="secondary" type="button" onclick="setParameterPreset('yesterday')">Yesterday Window</button>
+    <button class="secondary" type="button" onclick="setParameterPreset('lastMonth')">Last Month Window</button>
+    <button class="secondary" type="button" onclick="setParameterPreset('currentRun')">Current Run Time</button>
+  </div>
+  
+  <div style="margin-top:0.75rem;">
+    <button onclick="createReport()">Create Report</button>
+    <button class="secondary" onclick="updateReport()">Update Selected Report</button>
+    <button class="secondary" onclick="resetForm()">Clear / New</button>
+  </div>
 </div>
+
 <div class="panel">
+  <h3>Configured Reports</h3>
   <table>
-    <thead><tr><th>Id</th><th>Code</th><th>Name</th><th>Status</th><th>Actions</th></tr></thead>
+    <thead>
+      <tr>
+        <th>Id</th>
+        <th>Code</th>
+        <th>Report Name</th>
+        <th>Customer</th>
+        <th>Data Source</th>
+        <th>Schedule</th>
+        <th>File Config</th>
+        <th>Delivery Config</th>
+        <th>Status</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
     <tbody id="rows"></tbody>
   </table>
 </div>
+
 <div class="panel">
-  <h3>Execution History</h3>
-  <label>ReportId</label><input id="histId" type="number" />
-  <button onclick="loadHistory()">Load</button>
-  <table><thead><tr><th>ExecutionId</th><th>Status</th><th>Started</th><th>Completed</th><th>Records</th><th>Files</th><th>Error</th></tr></thead><tbody id="hist"></tbody></table>
+  <h3>Report Execution History</h3>
+  <div style="display:flex; gap:0.75rem; align-items:center; margin-bottom:0.75rem;">
+    <div style="flex:1;"><label>Select Report to View History</label><select id="histReportSelect"><option value="">-- Select Report --</option></select></div>
+    <div style="margin-top:1.25rem;"><button onclick="loadHistory()">Load History</button></div>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>ExecutionId</th>
+        <th>Status</th>
+        <th>Started At</th>
+        <th>Completed At</th>
+        <th>Records</th>
+        <th>Files</th>
+        <th>Error Message</th>
+      </tr>
+    </thead>
+    <tbody id="hist"></tbody>
+  </table>
 </div>
+
 @section Scripts {
 <script>
-async function load(){
-  const items=await api.get('/api/reports');
-  rows.innerHTML=items.map(x=>`<tr>
-    <td>${x.reportId}</td><td>${x.reportCode}</td><td>${x.reportName}</td><td>${x.status}</td>
+let customersMap = {};
+let dataSourcesMap = {};
+let schedulesMap = {};
+let fileConfigsMap = {};
+let deliveryConfigsMap = {};
+
+async function initCombos() {
+  try {
+    const [custs, dss, scheds, files, delis] = await Promise.all([
+      api.get('/api/customers'),
+      api.get('/api/datasources'),
+      api.get('/api/schedules'),
+      api.get('/api/fileconfigurations'),
+      api.get('/api/deliveryconfigurations')
+    ]);
+
+    rCustomer.innerHTML = '<option value="">-- Select Customer --</option>' + 
+      custs.map(c => { customersMap[c.customerId] = c; return `<option value="${c.customerId}">${c.customerName} (${c.customerCode})</option>`; }).join('');
+
+    rDs.innerHTML = '<option value="">-- Select Data Source --</option>' + 
+      dss.map(d => { dataSourcesMap[d.dataSourceId] = d; return `<option value="${d.dataSourceId}">${d.dataSourceName} [${d.dataSourceType}]</option>`; }).join('');
+
+    rSched.innerHTML = '<option value="">-- Select Schedule --</option>' + 
+      scheds.map(s => { schedulesMap[s.scheduleId] = s; return `<option value="${s.scheduleId}">${s.scheduleName} [${s.scheduleType}${s.cronExpression ? ' - ' + s.cronExpression : ''}]</option>`; }).join('');
+
+    rFile.innerHTML = '<option value="">-- Select File Configuration --</option>' + 
+      files.map(f => { fileConfigsMap[f.fileConfigId] = f; return `<option value="${f.fileConfigId}">${f.configurationName} [${f.fileFormat}]</option>`; }).join('');
+
+    rDel.innerHTML = '<option value="">-- Select Delivery Method --</option>' + 
+      delis.map(d => { deliveryConfigsMap[d.deliveryConfigId] = d; return `<option value="${d.deliveryConfigId}">${d.deliveryName} [${d.deliveryType}]</option>`; }).join('');
+  } catch(e) {
+    showMsg(msg, 'Error loading combo data: ' + e.message, false);
+  }
+}
+
+async function load() {
+  await initCombos();
+  const items = await api.get('/api/reports');
+
+  // Also update history report select dropdown
+  histReportSelect.innerHTML = '<option value="">-- Select Report --</option>' +
+    items.map(r => `<option value="${r.reportId}">${r.reportName} (${r.reportCode})</option>`).join('');
+
+  rows.innerHTML = items.map(x => `<tr>
+    <td><strong>${x.reportId}</strong></td>
+    <td><code>${x.reportCode}</code></td>
+    <td><strong>${x.reportName}</strong></td>
+    <td>${x.customerName || (customersMap[x.customerId] ? customersMap[x.customerId].customerName : 'ID: ' + x.customerId)}</td>
+    <td>${x.dataSourceName || (dataSourcesMap[x.dataSourceId] ? dataSourcesMap[x.dataSourceId].dataSourceName : 'ID: ' + x.dataSourceId)}</td>
+    <td>${x.scheduleName || (schedulesMap[x.scheduleId] ? schedulesMap[x.scheduleId].scheduleName : 'ID: ' + x.scheduleId)}</td>
+    <td>${x.fileConfigName || (fileConfigsMap[x.fileConfigId] ? fileConfigsMap[x.fileConfigId].configurationName : 'ID: ' + x.fileConfigId)}</td>
+    <td>${x.deliveryConfigName || (deliveryConfigsMap[x.deliveryConfigId] ? deliveryConfigsMap[x.deliveryConfigId].deliveryName : 'ID: ' + x.deliveryConfigId)}</td>
+    <td><span class="badge ${x.status.toLowerCase()}">${x.status}</span></td>
     <td>
-      <button onclick="act(${x.reportId},'activate')">Activate</button>
+      <button onclick="act(${x.reportId},'run')">Run Now</button>
+      <button class="secondary" onclick="act(${x.reportId},'activate')">Activate</button>
       <button class="secondary" onclick="act(${x.reportId},'pause')">Pause</button>
       <button class="secondary" onclick="act(${x.reportId},'resume')">Resume</button>
-      <button onclick="act(${x.reportId},'run')">Run Now</button>
       <button class="secondary" onclick="edit(${x.reportId})">Edit</button>
+      <button class="danger" onclick="deleteReport(${x.reportId}, '${x.reportName.replace(/'/g, "\\'")}')">Delete</button>
     </td></tr>`).join('');
 }
-function parseParams(){ return JSON.parse(rParams.value||'[]'); }
-async function createReport(){
-  try{
-    await api.send('/api/reports','POST',{
-      customerId:Number(rCustomer.value), reportCode:rCode.value, reportName:rName.value,
-      dataSourceId:Number(rDs.value), scheduleId:Number(rSched.value), fileConfigId:Number(rFile.value),
-      deliveryConfigId:Number(rDel.value), queryText:rQuery.value, description:null, parameters:parseParams()
+
+function parseParams() { 
+  try { return JSON.parse(rParams.value || '[]'); } 
+  catch(e) { throw new Error("Invalid Parameters JSON format"); }
+}
+
+function setParameterPreset(kind) {
+  const presets = {
+    incremental: [
+      { parameterName: "FromDate", parameterType: "DATETIME", parameterValue: null, valueSource: "PREVIOUS_EXECUTION" },
+      { parameterName: "ToDate", parameterType: "DATETIME", parameterValue: null, valueSource: "CURRENT_EXECUTION" }
+    ],
+    yesterday: [
+      { parameterName: "FromDate", parameterType: "DATETIME", parameterValue: "YESTERDAY_START", valueSource: "SYSTEM" },
+      { parameterName: "ToDate", parameterType: "DATETIME", parameterValue: "YESTERDAY_END", valueSource: "SYSTEM" }
+    ],
+    lastMonth: [
+      { parameterName: "FromDate", parameterType: "DATETIME", parameterValue: "PREVIOUS_MONTH_START", valueSource: "SYSTEM" },
+      { parameterName: "ToDate", parameterType: "DATETIME", parameterValue: "PREVIOUS_MONTH_END", valueSource: "SYSTEM" }
+    ],
+    currentRun: [
+      { parameterName: "CurrentExecution", parameterType: "DATETIME", parameterValue: null, valueSource: "CURRENT_EXECUTION" }
+    ]
+  };
+  rParams.value = JSON.stringify(presets[kind], null, 2);
+}
+
+async function createReport() {
+  try {
+    if (!rCustomer.value || !rDs.value || !rSched.value || !rFile.value || !rDel.value) {
+      throw new Error("Please select valid options for Customer, Data Source, Schedule, File Config, and Delivery Config dropdowns.");
+    }
+    await api.send('/api/reports', 'POST', {
+      customerId: Number(rCustomer.value), 
+      reportCode: rCode.value, 
+      reportName: rName.value,
+      dataSourceId: Number(rDs.value), 
+      scheduleId: Number(rSched.value), 
+      fileConfigId: Number(rFile.value),
+      deliveryConfigId: Number(rDel.value), 
+      queryText: rQuery.value, 
+      description: null, 
+      parameters: parseParams()
     });
-    showMsg(msg,'Created',true); await load();
-  }catch(e){ showMsg(msg,e.message,false); }
+    showMsg(msg, 'Report created successfully!', true); 
+    resetForm();
+    await load();
+  } catch(e) { showMsg(msg, e.message, false); }
 }
-async function updateReport(){
-  try{
-    await api.send('/api/reports/'+rId.value,'PUT',{
-      reportName:rName.value, dataSourceId:Number(rDs.value), scheduleId:Number(rSched.value),
-      fileConfigId:Number(rFile.value), deliveryConfigId:Number(rDel.value), queryText:rQuery.value,
-      description:null, parameters:parseParams()
+
+async function updateReport() {
+  try {
+    if (!rId.value) throw new Error("Please select a report from the table to edit first.");
+    if (!rDs.value || !rSched.value || !rFile.value || !rDel.value) {
+      throw new Error("Please select valid combo options.");
+    }
+    await api.send('/api/reports/' + rId.value, 'PUT', {
+      reportName: rName.value, 
+      dataSourceId: Number(rDs.value), 
+      scheduleId: Number(rSched.value),
+      fileConfigId: Number(rFile.value), 
+      deliveryConfigId: Number(rDel.value), 
+      queryText: rQuery.value,
+      description: null, 
+      parameters: parseParams()
     });
-    showMsg(msg,'Updated',true); await load();
-  }catch(e){ showMsg(msg,e.message,false); }
+    showMsg(msg, 'Report updated successfully!', true); 
+    resetForm();
+    await load();
+  } catch(e) { showMsg(msg, e.message, false); }
 }
-async function act(id, action){
-  try{ await api.send(`/api/reports/${id}/${action}`,'POST'); showMsg(msg, action+' OK', true); await load(); }
-  catch(e){ showMsg(msg,e.message,false); }
+
+async function act(id, action) {
+  try { 
+    await api.send(`/api/reports/${id}/${action}`, 'POST'); 
+    showMsg(msg, `Action '${action}' performed successfully`, true); 
+    await load(); 
+  } catch(e) { showMsg(msg, e.message, false); }
 }
-async function edit(id){
-  const x=await api.get('/api/reports/'+id);
-  rId.value=x.reportId; rCustomer.value=x.customerId; rCode.value=x.reportCode; rName.value=x.reportName;
-  rDs.value=x.dataSourceId; rSched.value=x.scheduleId; rFile.value=x.fileConfigId; rDel.value=x.deliveryConfigId;
-  rQuery.value=x.queryText; rParams.value=JSON.stringify(x.parameters,null,2); histId.value=id;
+
+async function edit(id) {
+  const x = await api.get('/api/reports/' + id);
+  rId.value = x.reportId; 
+  rCustomer.value = x.customerId; 
+  rCode.value = x.reportCode; 
+  rName.value = x.reportName;
+  rDs.value = x.dataSourceId; 
+  rSched.value = x.scheduleId; 
+  rFile.value = x.fileConfigId; 
+  rDel.value = x.deliveryConfigId;
+  rQuery.value = x.queryText; 
+  rParams.value = JSON.stringify(x.parameters, null, 2); 
+  histReportSelect.value = id;
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
-async function loadHistory(){
-  const items=await api.get('/api/reports/'+histId.value+'/executions');
-  hist.innerHTML=items.map(x=>`<tr><td>${x.executionId}</td><td>${x.status}</td><td>${x.startedAt||''}</td><td>${x.completedAt||''}</td><td>${x.recordCount??''}</td><td>${x.fileCount??''}</td><td>${x.errorMessage||''}</td></tr>`).join('');
+
+async function deleteReport(id, label) {
+  if (!confirm(`Delete report "${label}"?`)) return;
+  try {
+    await api.send('/api/reports/' + id, 'DELETE');
+    showMsg(msg, 'Report deleted successfully!', true);
+    resetForm();
+    await load();
+  } catch(e) { showMsg(msg, e.message, false); }
 }
+
+function resetForm() {
+  rId.value = '';
+  rCustomer.value = '';
+  rCode.value = '';
+  rName.value = '';
+  rDs.value = '';
+  rSched.value = '';
+  rFile.value = '';
+  rDel.value = '';
+  rQuery.value = "SELECT CAST(1 AS INT) AS Id, 'Demo' AS Name, GETUTCDATE() AS CreatedDate";
+  rParams.value = '[{"parameterName":"CurrentExecution","parameterType":"DATETIME","parameterValue":null,"valueSource":"CURRENT_EXECUTION"}]';
+}
+
+async function loadHistory() {
+  const id = histReportSelect.value;
+  if (!id) {
+    showMsg(msg, 'Please select a report from the dropdown to load execution history.', false);
+    return;
+  }
+  const items = await api.get('/api/reports/' + id + '/executions');
+  if (items.length === 0) {
+    hist.innerHTML = '<tr><td colspan="7">No execution history found for this report.</td></tr>';
+    return;
+  }
+  hist.innerHTML = items.map(x => `<tr>
+    <td><strong>#${x.executionId}</strong></td>
+    <td><span class="badge ${x.status.toLowerCase()}">${x.status}</span></td>
+    <td>${x.startedAt ? new Date(x.startedAt).toLocaleString() : '-'}</td>
+    <td>${x.completedAt ? new Date(x.completedAt).toLocaleString() : '-'}</td>
+    <td>${x.recordCount ?? '-'}</td>
+    <td>${x.fileCount ?? '-'}</td>
+    <td>${x.errorMessage ? `<span style="color:var(--danger);">${x.errorMessage}</span>` : 'None'}</td>
+  </tr>`).join('');
+}
+
 load();
 </script>
 }

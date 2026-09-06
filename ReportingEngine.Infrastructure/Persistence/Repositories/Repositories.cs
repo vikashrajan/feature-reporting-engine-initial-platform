@@ -27,6 +27,9 @@ public sealed class CustomerRepository : ICustomerRepository
     public Task<Customer?> GetByCodeAsync(string code, CancellationToken cancellationToken = default) =>
         _db.Customers.FirstOrDefaultAsync(x => x.CustomerCode == code, cancellationToken);
 
+    public Task<bool> IsReferencedAsync(long id, CancellationToken cancellationToken = default) =>
+        _db.Reports.AnyAsync(x => x.CustomerId == id, cancellationToken);
+
     public async Task<Customer> AddAsync(Customer entity, CancellationToken cancellationToken = default)
     {
         await _db.Customers.AddAsync(entity, cancellationToken);
@@ -36,6 +39,12 @@ public sealed class CustomerRepository : ICustomerRepository
     public Task UpdateAsync(Customer entity, CancellationToken cancellationToken = default)
     {
         _db.Customers.Update(entity);
+        return Task.CompletedTask;
+    }
+
+    public Task DeleteAsync(Customer entity, CancellationToken cancellationToken = default)
+    {
+        _db.Customers.Remove(entity);
         return Task.CompletedTask;
     }
 }
@@ -51,6 +60,9 @@ public sealed class DataSourceRepository : IDataSourceRepository
     public Task<DataSource?> GetByIdAsync(long id, CancellationToken cancellationToken = default) =>
         _db.DataSources.FirstOrDefaultAsync(x => x.DataSourceId == id, cancellationToken);
 
+    public Task<bool> IsReferencedAsync(long id, CancellationToken cancellationToken = default) =>
+        _db.Reports.AnyAsync(x => x.DataSourceId == id, cancellationToken);
+
     public async Task<DataSource> AddAsync(DataSource entity, CancellationToken cancellationToken = default)
     {
         await _db.DataSources.AddAsync(entity, cancellationToken);
@@ -60,6 +72,12 @@ public sealed class DataSourceRepository : IDataSourceRepository
     public Task UpdateAsync(DataSource entity, CancellationToken cancellationToken = default)
     {
         _db.DataSources.Update(entity);
+        return Task.CompletedTask;
+    }
+
+    public Task DeleteAsync(DataSource entity, CancellationToken cancellationToken = default)
+    {
+        _db.DataSources.Remove(entity);
         return Task.CompletedTask;
     }
 }
@@ -75,6 +93,9 @@ public sealed class ScheduleRepository : IScheduleRepository
     public Task<Schedule?> GetByIdAsync(long id, CancellationToken cancellationToken = default) =>
         _db.Schedules.FirstOrDefaultAsync(x => x.ScheduleId == id, cancellationToken);
 
+    public Task<bool> IsReferencedAsync(long id, CancellationToken cancellationToken = default) =>
+        _db.Reports.AnyAsync(x => x.ScheduleId == id, cancellationToken);
+
     public async Task<Schedule> AddAsync(Schedule entity, CancellationToken cancellationToken = default)
     {
         await _db.Schedules.AddAsync(entity, cancellationToken);
@@ -84,6 +105,12 @@ public sealed class ScheduleRepository : IScheduleRepository
     public Task UpdateAsync(Schedule entity, CancellationToken cancellationToken = default)
     {
         _db.Schedules.Update(entity);
+        return Task.CompletedTask;
+    }
+
+    public Task DeleteAsync(Schedule entity, CancellationToken cancellationToken = default)
+    {
+        _db.Schedules.Remove(entity);
         return Task.CompletedTask;
     }
 }
@@ -99,6 +126,9 @@ public sealed class FileConfigurationRepository : IFileConfigurationRepository
     public Task<FileConfiguration?> GetByIdAsync(long id, CancellationToken cancellationToken = default) =>
         _db.FileConfigurations.FirstOrDefaultAsync(x => x.FileConfigId == id, cancellationToken);
 
+    public Task<bool> IsReferencedAsync(long id, CancellationToken cancellationToken = default) =>
+        _db.Reports.AnyAsync(x => x.FileConfigId == id, cancellationToken);
+
     public async Task<FileConfiguration> AddAsync(FileConfiguration entity, CancellationToken cancellationToken = default)
     {
         await _db.FileConfigurations.AddAsync(entity, cancellationToken);
@@ -108,6 +138,12 @@ public sealed class FileConfigurationRepository : IFileConfigurationRepository
     public Task UpdateAsync(FileConfiguration entity, CancellationToken cancellationToken = default)
     {
         _db.FileConfigurations.Update(entity);
+        return Task.CompletedTask;
+    }
+
+    public Task DeleteAsync(FileConfiguration entity, CancellationToken cancellationToken = default)
+    {
+        _db.FileConfigurations.Remove(entity);
         return Task.CompletedTask;
     }
 }
@@ -123,6 +159,9 @@ public sealed class DeliveryConfigurationRepository : IDeliveryConfigurationRepo
     public Task<DeliveryConfiguration?> GetByIdAsync(long id, CancellationToken cancellationToken = default) =>
         _db.DeliveryConfigurations.FirstOrDefaultAsync(x => x.DeliveryConfigId == id, cancellationToken);
 
+    public Task<bool> IsReferencedAsync(long id, CancellationToken cancellationToken = default) =>
+        _db.Reports.AnyAsync(x => x.DeliveryConfigId == id, cancellationToken);
+
     public async Task<DeliveryConfiguration> AddAsync(DeliveryConfiguration entity, CancellationToken cancellationToken = default)
     {
         await _db.DeliveryConfigurations.AddAsync(entity, cancellationToken);
@@ -134,6 +173,12 @@ public sealed class DeliveryConfigurationRepository : IDeliveryConfigurationRepo
         _db.DeliveryConfigurations.Update(entity);
         return Task.CompletedTask;
     }
+
+    public Task DeleteAsync(DeliveryConfiguration entity, CancellationToken cancellationToken = default)
+    {
+        _db.DeliveryConfigurations.Remove(entity);
+        return Task.CompletedTask;
+    }
 }
 
 public sealed class ReportRepository : IReportRepository
@@ -142,7 +187,14 @@ public sealed class ReportRepository : IReportRepository
     public ReportRepository(ReportingEngineDbContext db) => _db = db;
 
     public async Task<IReadOnlyList<ReportDefinition>> GetAllAsync(CancellationToken cancellationToken = default) =>
-        await _db.Reports.AsNoTracking().Include(x => x.Parameters).OrderBy(x => x.ReportName).ToListAsync(cancellationToken);
+        await _db.Reports.AsNoTracking()
+            .Include(x => x.Customer)
+            .Include(x => x.DataSource)
+            .Include(x => x.Schedule)
+            .Include(x => x.FileConfiguration)
+            .Include(x => x.DeliveryConfiguration)
+            .Include(x => x.Parameters)
+            .OrderBy(x => x.ReportName).ToListAsync(cancellationToken);
 
     public Task<ReportDefinition?> GetByIdAsync(long id, CancellationToken cancellationToken = default) =>
         _db.Reports.FirstOrDefaultAsync(x => x.ReportId == id, cancellationToken);
@@ -166,6 +218,9 @@ public sealed class ReportRepository : IReportRepository
             .Where(x => x.IsActive && x.Status == ReportStatuses.Active)
             .ToListAsync(cancellationToken);
 
+    public Task<bool> HasExecutionsAsync(long id, CancellationToken cancellationToken = default) =>
+        _db.JobExecutions.AnyAsync(x => x.ReportId == id, cancellationToken);
+
     public async Task<ReportDefinition> AddAsync(ReportDefinition entity, CancellationToken cancellationToken = default)
     {
         await _db.Reports.AddAsync(entity, cancellationToken);
@@ -175,6 +230,12 @@ public sealed class ReportRepository : IReportRepository
     public Task UpdateAsync(ReportDefinition entity, CancellationToken cancellationToken = default)
     {
         _db.Reports.Update(entity);
+        return Task.CompletedTask;
+    }
+
+    public Task DeleteAsync(ReportDefinition entity, CancellationToken cancellationToken = default)
+    {
+        _db.Reports.Remove(entity);
         return Task.CompletedTask;
     }
 }
@@ -218,6 +279,68 @@ public sealed class JobExecutionRepository : IJobExecutionRepository
         var upcoming = await _db.Reports.CountAsync(
             x => x.IsActive && x.Status == ReportStatuses.Active, cancellationToken);
         return new DashboardCounts(running, successful, failed, upcoming);
+    }
+
+    public async Task<IReadOnlyList<DashboardDetailRow>> GetDashboardDetailsAsync(string category, CancellationToken cancellationToken = default)
+    {
+        var normalized = category.Trim().ToUpperInvariant();
+        var since = DateTime.UtcNow.AddHours(-24);
+
+        if (normalized == "UPCOMING")
+        {
+            return await _db.Reports.AsNoTracking()
+                .Include(x => x.Customer)
+                .Include(x => x.Schedule)
+                .Where(x => x.IsActive && x.Status == ReportStatuses.Active)
+                .OrderBy(x => x.ReportCode)
+                .Take(200)
+                .Select(x => new DashboardDetailRow(
+                    null,
+                    x.ReportId,
+                    x.ReportCode,
+                    x.ReportName,
+                    x.Customer.CustomerName,
+                    x.Status,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    x.Schedule.CronExpression))
+                .ToListAsync(cancellationToken);
+        }
+
+        var query = _db.JobExecutions.AsNoTracking()
+            .Include(x => x.Report)
+            .ThenInclude(x => x.Customer)
+            .AsQueryable();
+
+        query = normalized switch
+        {
+            "RUNNING" => query.Where(x => x.Status == JobExecutionStatuses.Running || x.Status == JobExecutionStatuses.Retrying),
+            "SUCCESSFUL" => query.Where(x => x.Status == JobExecutionStatuses.Success && x.CompletedAt >= since),
+            "FAILED" => query.Where(x => x.Status == JobExecutionStatuses.Failed && x.CompletedAt >= since),
+            _ => throw new InvalidOperationException($"Unsupported dashboard detail category '{category}'.")
+        };
+
+        return await query
+            .OrderByDescending(x => x.StartedAt ?? x.ScheduledTime)
+            .ThenByDescending(x => x.ExecutionId)
+            .Take(200)
+            .Select(x => new DashboardDetailRow(
+                x.ExecutionId,
+                x.ReportId,
+                x.Report.ReportCode,
+                x.Report.ReportName,
+                x.Report.Customer.CustomerName,
+                x.Status,
+                x.ScheduledTime,
+                x.StartedAt,
+                x.CompletedAt,
+                x.RecordCount,
+                x.FileCount,
+                x.ErrorMessage))
+            .ToListAsync(cancellationToken);
     }
 
     public async Task<JobExecution> AddAsync(JobExecution entity, CancellationToken cancellationToken = default)

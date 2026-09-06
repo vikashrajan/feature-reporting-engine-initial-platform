@@ -31,4 +31,7 @@ public sealed record DeliveryTokenContext(
     string ReportCode,
     DateTime ExecutionDateUtc,
     long RecordCount,
-    int FileCount);
+    int FileCount,
+    long? ExecutionId = null,
+    string? Status = null,
+    string? ErrorMessage = null);

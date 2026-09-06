@@ -33,17 +33,21 @@ public sealed class CustomerService : ICustomerService
 
     public async Task<CustomerDto> CreateAsync(CreateCustomerRequest request, string performedBy, CancellationToken cancellationToken = default)
     {
-        var existing = await _repository.GetByCodeAsync(request.CustomerCode, cancellationToken);
+        var customerCode = Required(request.CustomerCode, "Customer code");
+        var customerName = Required(request.CustomerName, "Customer name");
+        var timeZoneId = NormalizeTimeZone(request.TimeZoneId);
+
+        var existing = await _repository.GetByCodeAsync(customerCode, cancellationToken);
         if (existing is not null)
         {
-            throw new InvalidOperationException($"Customer code '{request.CustomerCode}' already exists.");
+            throw new InvalidOperationException($"Customer code '{customerCode}' already exists.");
         }
 
         var entity = new Customer
         {
-            CustomerCode = request.CustomerCode.Trim(),
-            CustomerName = request.CustomerName.Trim(),
-            TimeZoneId = request.TimeZoneId,
+            CustomerCode = customerCode,
+            CustomerName = customerName,
+            TimeZoneId = timeZoneId,
             IsActive = true,
             CreatedBy = performedBy,
             CreatedDate = DateTime.UtcNow
@@ -60,9 +64,12 @@ public sealed class CustomerService : ICustomerService
         var entity = await _repository.GetByIdAsync(id, cancellationToken)
             ?? throw new KeyNotFoundException($"Customer {id} was not found.");
 
+        var customerName = Required(request.CustomerName, "Customer name");
+        var timeZoneId = NormalizeTimeZone(request.TimeZoneId);
+
         var old = Map(entity);
-        entity.CustomerName = request.CustomerName.Trim();
-        entity.TimeZoneId = request.TimeZoneId;
+        entity.CustomerName = customerName;
+        entity.TimeZoneId = timeZoneId;
         entity.IsActive = request.IsActive;
         entity.ModifiedBy = performedBy;
         entity.ModifiedDate = DateTime.UtcNow;
@@ -73,6 +80,50 @@ public sealed class CustomerService : ICustomerService
         return Map(entity);
     }
 
+    public async Task DeleteAsync(long id, string performedBy, CancellationToken cancellationToken = default)
+    {
+        var entity = await _repository.GetByIdAsync(id, cancellationToken)
+            ?? throw new KeyNotFoundException($"Customer {id} was not found.");
+
+        if (await _repository.IsReferencedAsync(id, cancellationToken))
+        {
+            throw new InvalidOperationException("Cannot delete this customer because it is used by one or more reports.");
+        }
+
+        var old = Map(entity);
+        await _repository.DeleteAsync(entity, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        await _audit.WriteAsync(nameof(Customer), id, AuditActions.Delete, performedBy, old, cancellationToken: cancellationToken);
+    }
+
     private static CustomerDto Map(Customer c) =>
         new(c.CustomerId, c.CustomerCode, c.CustomerName, c.TimeZoneId, c.IsActive);
+
+    private static string Required(string? value, string label)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            throw new InvalidOperationException($"{label} is required.");
+        }
+
+        return value.Trim();
+    }
+
+    private static string NormalizeTimeZone(string? timeZoneId)
+    {
+        var value = string.IsNullOrWhiteSpace(timeZoneId) ? "UTC" : timeZoneId.Trim();
+        try
+        {
+            _ = TimeZoneInfo.FindSystemTimeZoneById(value);
+            return value;
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            throw new InvalidOperationException($"Time zone '{value}' was not found. Please select a valid time zone from the list.");
+        }
+        catch (InvalidTimeZoneException)
+        {
+            throw new InvalidOperationException($"Time zone '{value}' is invalid. Please select a valid time zone from the list.");
+        }
+    }
 }

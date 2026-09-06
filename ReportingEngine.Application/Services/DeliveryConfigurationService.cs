@@ -33,7 +33,7 @@ public sealed class DeliveryConfigurationService : IDeliveryConfigurationService
 
     public async Task<DeliveryConfigurationDto> CreateAsync(CreateDeliveryConfigurationRequest request, string performedBy, CancellationToken cancellationToken = default)
     {
-        Validate(request.DeliveryType, request.EmailTo, request.DestinationReference);
+        Validate(request.DeliveryType, request.EmailTo, request.DestinationReference, request.SecretReference);
 
         var entity = new DeliveryConfiguration
         {
@@ -59,7 +59,7 @@ public sealed class DeliveryConfigurationService : IDeliveryConfigurationService
 
     public async Task<DeliveryConfigurationDto> UpdateAsync(long id, UpdateDeliveryConfigurationRequest request, string performedBy, CancellationToken cancellationToken = default)
     {
-        Validate(request.DeliveryType, request.EmailTo, request.DestinationReference);
+        Validate(request.DeliveryType, request.EmailTo, request.DestinationReference, request.SecretReference);
 
         var entity = await _repository.GetByIdAsync(id, cancellationToken)
             ?? throw new KeyNotFoundException($"Delivery configuration {id} was not found.");
@@ -84,10 +84,26 @@ public sealed class DeliveryConfigurationService : IDeliveryConfigurationService
         return Map(entity);
     }
 
-    internal static void Validate(string deliveryType, string? emailTo, string? destinationReference)
+    public async Task DeleteAsync(long id, string performedBy, CancellationToken cancellationToken = default)
+    {
+        var entity = await _repository.GetByIdAsync(id, cancellationToken)
+            ?? throw new KeyNotFoundException($"Delivery configuration {id} was not found.");
+
+        if (await _repository.IsReferencedAsync(id, cancellationToken))
+        {
+            throw new InvalidOperationException("Cannot delete this delivery configuration because it is used by one or more reports.");
+        }
+
+        var old = Map(entity);
+        await _repository.DeleteAsync(entity, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        await _audit.WriteAsync(nameof(DeliveryConfiguration), id, AuditActions.Delete, performedBy, old, cancellationToken: cancellationToken);
+    }
+
+    internal static void Validate(string deliveryType, string? emailTo, string? destinationReference, string? secretReference = null)
     {
         var type = deliveryType.Trim().ToUpperInvariant();
-        var valid = new[] { DeliveryTypes.Email, DeliveryTypes.Sftp, DeliveryTypes.Ftp, DeliveryTypes.SharedFolder, DeliveryTypes.Blob };
+        var valid = new[] { DeliveryTypes.Email, DeliveryTypes.Sftp, DeliveryTypes.Ftp, DeliveryTypes.SharedFolder, DeliveryTypes.Blob, DeliveryTypes.AzureFileShare, DeliveryTypes.S3 };
         if (!valid.Contains(type))
         {
             throw new InvalidOperationException($"Unsupported delivery type '{deliveryType}'.");
@@ -102,6 +118,16 @@ public sealed class DeliveryConfigurationService : IDeliveryConfigurationService
             && string.IsNullOrWhiteSpace(destinationReference))
         {
             throw new InvalidOperationException("DestinationReference is required for this delivery type.");
+        }
+
+        if (type == DeliveryTypes.AzureFileShare && string.IsNullOrWhiteSpace(secretReference))
+        {
+            throw new InvalidOperationException("Azure File Share connection settings are required.");
+        }
+
+        if (type == DeliveryTypes.S3 && string.IsNullOrWhiteSpace(secretReference))
+        {
+            throw new InvalidOperationException("S3 connection settings are required.");
         }
     }
 

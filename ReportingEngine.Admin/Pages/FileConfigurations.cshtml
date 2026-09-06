@@ -1,23 +1,233 @@
 @page
 @model ReportingEngine.Admin.Pages.FileConfigurationsModel
-<h1>File Configurations</h1>
+<h1>File Output Configurations</h1>
 <div id="msg"></div>
+
+<style>
+  tr.selected-row {
+    background-color: #dbeafe !important;
+    border-left: 4px solid #2563eb !important;
+  }
+  tr.selected-row td {
+    font-weight: 600;
+  }
+</style>
+
 <div class="panel">
+  <h3 id="formTitle">Create / Edit File Configuration</h3>
   <div class="grid-2">
-    <div><label>Name</label><input id="fName" /></div>
-    <div><label>Format</label><select id="fFormat"><option>CSV</option><option>JSON</option><option>TXT</option><option>EXCEL</option><option>XML</option></select></div>
-    <div><label>FileNamePattern</label><input id="fPattern" value="Report_{CustomerCode}_{yyyyMMdd}_{Sequence}.csv" /></div>
-    <div><label>SplitEnabled</label><select id="fSplit"><option value="false">false</option><option value="true">true</option></select></div>
-    <div><label>SplitType</label><select id="fSplitType"><option value="">(none)</option><option>RECORD_COUNT</option><option>FILE_SIZE</option></select></div>
-    <div><label>SplitValue</label><input id="fSplitValue" type="number" /></div>
+    <div><label>Config ID (auto for Edit)</label><input id="fId" placeholder="Leave empty for Create" readonly style="background:#f3f4f6;" /></div>
+    <div><label>Configuration Profile Name</label><input id="fName" placeholder="e.g. Compressed CSV Export" /></div>
+    <div><label>File Format</label>
+      <select id="fFormat">
+        <option value="CSV">CSV (Comma Separated)</option>
+        <option value="JSON">JSON (JavaScript Object Notation)</option>
+        <option value="TXT">TXT (Plain Text)</option>
+        <option value="EXCEL">EXCEL (OpenXML Spreadsheet)</option>
+        <option value="XML">XML (Extensible Markup Language)</option>
+      </select>
+    </div>
+    <div><label>File Naming Pattern</label><input id="fPattern" value="Report_{CustomerCode}_{yyyyMMdd}_{Sequence}.csv" placeholder="e.g. Report_{CustomerCode}_{yyyyMMdd}.csv" /></div>
+    
+    <div><label>Enable File Splitting</label>
+      <select id="fSplit" onchange="toggleSplitFields()">
+        <option value="false">false (Single File Output)</option>
+        <option value="true">true (Split Large Files)</option>
+      </select>
+    </div>
+    <div id="splitTypeGroup"><label>Split Criteria Type</label>
+      <select id="fSplitType">
+        <option value="">(none)</option>
+        <option value="RECORD_COUNT">RECORD_COUNT (Split by number of rows)</option>
+        <option value="FILE_SIZE">FILE_SIZE (Split by megabytes)</option>
+      </select>
+    </div>
+    <div id="splitValueGroup"><label>Split Limit Value</label><input id="fSplitValue" type="number" placeholder="e.g. 5000 records or 10 MB" /></div>
+
+    <div><label>ZIP File Compression</label>
+      <select id="fZip" onchange="toggleZipFields()">
+        <option value="false">false (Generate Uncompressed Raw Files)</option>
+        <option value="true">true (Bundle All Output Files into 1 .zip Archive)</option>
+      </select>
+    </div>
+    <div id="zipBatchGroup"><label>Files Per ZIP Batch</label><input id="fZipBatchSize" type="number" min="1" placeholder="e.g. 10 files per ZIP/email" /></div>
+    <div><label>Keep Local Files After Delivery</label>
+      <select id="fKeepLocal">
+        <option value="true">true (Keep generated files locally)</option>
+        <option value="false">false (Delete after successful delivery)</option>
+      </select>
+    </div>
   </div>
-  <button onclick="createFile()">Create</button>
+
+  <div style="margin-top:0.75rem;">
+    <button onclick="createFile()">Create Configuration</button>
+    <button class="secondary" onclick="updateFile()">Update Configuration</button>
+    <button class="secondary" onclick="resetForm()">Clear / New</button>
+  </div>
 </div>
-<div class="panel"><table><thead><tr><th>Id</th><th>Name</th><th>Format</th><th>Pattern</th><th>Split</th></tr></thead><tbody id="rows"></tbody></table></div>
+
+<div class="panel">
+  <h3>Configured File Profiles</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Id</th>
+        <th>Configuration Name</th>
+        <th>Format</th>
+        <th>File Naming Pattern</th>
+        <th>File Splitting</th>
+        <th>ZIP Compression</th>
+        <th>ZIP Batch Size</th>
+        <th>Keep Local</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody id="rows"></tbody>
+  </table>
+</div>
+
 @section Scripts {
 <script>
-async function load(){ const items=await api.get('/api/fileconfigurations'); rows.innerHTML=items.map(x=>`<tr><td>${x.fileConfigId}</td><td>${x.configurationName}</td><td>${x.fileFormat}</td><td>${x.fileNamePattern}</td><td>${x.splitEnabled? x.splitType+'/'+x.splitValue:''}</td></tr>`).join(''); }
-async function createFile(){ try{ await api.send('/api/fileconfigurations','POST',{configurationName:fName.value,fileFormat:fFormat.value,fileNamePattern:fPattern.value,splitEnabled:fSplit.value==='true',splitType:fSplitType.value||null,splitValue:fSplitValue.value?Number(fSplitValue.value):null,compressionType:null,encryptionEnabled:false}); showMsg(msg,'Created',true); await load(); } catch(e){ showMsg(msg,e.message,false);} }
+let currentSelectedId = null;
+
+function toggleSplitFields() {
+  const isSplit = fSplit.value === 'true';
+  splitTypeGroup.style.display = isSplit ? 'block' : 'none';
+  splitValueGroup.style.display = isSplit ? 'block' : 'none';
+}
+
+function toggleZipFields() {
+  const isZip = fZip.value === 'true';
+  zipBatchGroup.style.display = isZip ? 'block' : 'none';
+  if (!isZip) fZipBatchSize.value = '';
+}
+
+async function load() {
+  const items = await api.get('/api/fileconfigurations');
+  rows.innerHTML = items.map(x => `
+    <tr id="row-${x.fileConfigId}" class="${currentSelectedId == x.fileConfigId ? 'selected-row' : ''}">
+      <td><strong>#${x.fileConfigId}</strong></td>
+      <td><strong>${x.configurationName}</strong></td>
+      <td><span class="badge active">${x.fileFormat}</span></td>
+      <td><code>${x.fileNamePattern}</code></td>
+      <td>${x.splitEnabled ? `${x.splitType} (${x.splitValue})` : 'Disabled'}</td>
+      <td>${x.compressionType === 'ZIP' ? '<span class="badge sftp">ZIP</span>' : '<span style="color:var(--muted);">No (Raw)</span>'}</td>
+      <td>${x.compressionType === 'ZIP' ? (x.zipBatchSize ? `${x.zipBatchSize} files` : 'All files') : '-'}</td>
+      <td>${x.keepLocalFiles ? '<span class="badge active">Yes</span>' : '<span style="color:var(--danger);">No</span>'}</td>
+      <td>
+        <button class="secondary" onclick="edit(${x.fileConfigId})">Edit</button>
+        <button class="danger" onclick="deleteFileConfig(${x.fileConfigId}, '${x.configurationName.replace(/'/g, "\\'")}')">Delete</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+async function createFile() {
+  try {
+    const isZip = fZip.value === 'true';
+    await api.send('/api/fileconfigurations', 'POST', {
+      configurationName: fName.value,
+      fileFormat: fFormat.value,
+      fileNamePattern: fPattern.value,
+      splitEnabled: fSplit.value === 'true',
+      splitType: fSplit.value === 'true' ? (fSplitType.value || null) : null,
+      splitValue: fSplit.value === 'true' && fSplitValue.value ? Number(fSplitValue.value) : null,
+      compressionType: isZip ? 'ZIP' : null,
+      zipBatchSize: isZip && fZipBatchSize.value ? Number(fZipBatchSize.value) : null,
+      keepLocalFiles: fKeepLocal.value === 'true',
+      encryptionEnabled: false
+    });
+    showMsg(msg, 'File Configuration created successfully!', true);
+    resetForm();
+    await load();
+  } catch(e) { showMsg(msg, e.message, false); }
+}
+
+async function updateFile() {
+  try {
+    if (!fId.value) throw new Error("Please select a file configuration from the table to edit first.");
+    const isZip = fZip.value === 'true';
+    await api.send('/api/fileconfigurations/' + fId.value, 'PUT', {
+      configurationName: fName.value,
+      fileFormat: fFormat.value,
+      fileNamePattern: fPattern.value,
+      splitEnabled: fSplit.value === 'true',
+      splitType: fSplit.value === 'true' ? (fSplitType.value || null) : null,
+      splitValue: fSplit.value === 'true' && fSplitValue.value ? Number(fSplitValue.value) : null,
+      compressionType: isZip ? 'ZIP' : null,
+      zipBatchSize: isZip && fZipBatchSize.value ? Number(fZipBatchSize.value) : null,
+      keepLocalFiles: fKeepLocal.value === 'true',
+      encryptionEnabled: false
+    });
+    showMsg(msg, 'File Configuration updated successfully!', true);
+    resetForm();
+    await load();
+  } catch(e) { showMsg(msg, e.message, false); }
+}
+
+async function edit(id) {
+  try {
+    const x = await api.get('/api/fileconfigurations/' + id);
+    if (!x) throw new Error("File configuration not found");
+    
+    currentSelectedId = id;
+    fId.value = x.fileConfigId;
+    fName.value = x.configurationName;
+    fFormat.value = x.fileFormat;
+    fPattern.value = x.fileNamePattern;
+    fSplit.value = x.splitEnabled ? 'true' : 'false';
+    fSplitType.value = x.splitType || '';
+    fSplitValue.value = x.splitValue || '';
+    fZip.value = (x.compressionType && x.compressionType.toUpperCase() === 'ZIP') ? 'true' : 'false';
+    fZipBatchSize.value = x.zipBatchSize || '';
+    fKeepLocal.value = x.keepLocalFiles === false ? 'false' : 'true';
+    
+    toggleSplitFields();
+    toggleZipFields();
+    
+    document.querySelectorAll('#rows tr').forEach(r => r.classList.remove('selected-row'));
+    const targetRow = document.getElementById('row-' + id);
+    if (targetRow) {
+      targetRow.classList.add('selected-row');
+    }
+
+    formTitle.innerText = `Edit File Configuration #${x.fileConfigId} (${x.configurationName})`;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  } catch(e) {
+    showMsg(msg, 'Failed to load edit data: ' + e.message, false);
+  }
+}
+
+function resetForm() {
+  currentSelectedId = null;
+  fId.value = '';
+  fName.value = '';
+  fFormat.value = 'CSV';
+  fPattern.value = 'Report_{CustomerCode}_{yyyyMMdd}_{Sequence}.csv';
+  fSplit.value = 'false';
+  fSplitType.value = '';
+  fSplitValue.value = '';
+  fZip.value = 'false';
+  fZipBatchSize.value = '';
+  fKeepLocal.value = 'true';
+  formTitle.innerText = 'Create / Edit File Configuration';
+  toggleSplitFields();
+  toggleZipFields();
+  document.querySelectorAll('#rows tr').forEach(r => r.classList.remove('selected-row'));
+}
+
+async function deleteFileConfig(id, label) {
+  if (!confirm(`Delete file configuration "${label}"?`)) return;
+  try {
+    await api.send('/api/fileconfigurations/' + id, 'DELETE');
+    showMsg(msg, 'File configuration deleted successfully!', true);
+    resetForm();
+    await load();
+  } catch(e) { showMsg(msg, e.message, false); }
+}
+
+toggleSplitFields();
+toggleZipFields();
 load();
 </script>
 }

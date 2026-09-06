@@ -14,6 +14,7 @@ public static class DependencyInjection
         services.AddScoped<IDeliveryConfigurationService, DeliveryConfigurationService>();
         services.AddScoped<IReportService, ReportService>();
         services.AddScoped<IExecutionService, ExecutionService>();
+        services.AddScoped<IEmailSettingsService, EmailSettingsService>();
         return services;
     }
 }

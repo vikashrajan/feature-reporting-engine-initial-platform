@@ -78,6 +78,22 @@ public sealed class ScheduleService : IScheduleService
         return Map(entity);
     }
 
+    public async Task DeleteAsync(long id, string performedBy, CancellationToken cancellationToken = default)
+    {
+        var entity = await _repository.GetByIdAsync(id, cancellationToken)
+            ?? throw new KeyNotFoundException($"Schedule {id} was not found.");
+
+        if (await _repository.IsReferencedAsync(id, cancellationToken))
+        {
+            throw new InvalidOperationException("Cannot delete this schedule because it is used by one or more reports.");
+        }
+
+        var old = Map(entity);
+        await _repository.DeleteAsync(entity, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        await _audit.WriteAsync(nameof(Schedule), id, AuditActions.Delete, performedBy, old, cancellationToken: cancellationToken);
+    }
+
     internal static void ValidateSchedule(string scheduleType, string? cronExpression, string timeZoneId)
     {
         var type = scheduleType.Trim().ToUpperInvariant();

@@ -68,6 +68,22 @@ public sealed class DataSourceService : IDataSourceService
         return Map(entity);
     }
 
+    public async Task DeleteAsync(long id, string performedBy, CancellationToken cancellationToken = default)
+    {
+        var entity = await _repository.GetByIdAsync(id, cancellationToken)
+            ?? throw new KeyNotFoundException($"Data source {id} was not found.");
+
+        if (await _repository.IsReferencedAsync(id, cancellationToken))
+        {
+            throw new InvalidOperationException("Cannot delete this data source because it is used by one or more reports.");
+        }
+
+        var old = Map(entity);
+        await _repository.DeleteAsync(entity, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        await _audit.WriteAsync(nameof(DataSource), id, AuditActions.Delete, performedBy, old, cancellationToken: cancellationToken);
+    }
+
     private static DataSourceDto Map(DataSource d) =>
         new(d.DataSourceId, d.DataSourceName, d.DataSourceType, d.ConnectionReference, d.IsActive);
 }

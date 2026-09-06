@@ -35,6 +35,13 @@ public sealed class ReportsController : ControllerBase
     public async Task<ActionResult<ReportDto>> Update(long id, [FromBody] UpdateReportRequest request, CancellationToken cancellationToken) =>
         Ok(await _service.UpdateAsync(id, request, UserName(), cancellationToken));
 
+    [HttpDelete("{id:long}")]
+    public async Task<IActionResult> Delete(long id, CancellationToken cancellationToken)
+    {
+        await _service.DeleteAsync(id, UserName(), cancellationToken);
+        return NoContent();
+    }
+
     [HttpPost("{id:long}/activate")]
     public async Task<IActionResult> Activate(long id, CancellationToken cancellationToken)
     {
@@ -109,4 +116,8 @@ public sealed class DashboardController : ControllerBase
     [HttpGet]
     public async Task<ActionResult<DashboardDto>> Get(CancellationToken cancellationToken) =>
         Ok(await _service.GetDashboardAsync(cancellationToken));
+
+    [HttpGet("{category}")]
+    public async Task<ActionResult<IReadOnlyList<DashboardDetailDto>>> Details(string category, CancellationToken cancellationToken) =>
+        Ok(await _service.GetDashboardDetailsAsync(category, cancellationToken));
 }

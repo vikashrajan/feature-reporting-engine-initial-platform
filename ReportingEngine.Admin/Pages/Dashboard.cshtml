@@ -5,21 +5,86 @@
 }
 <h1>Dashboard</h1>
 <div class="cards" id="cards">
-  <div class="card"><div class="label">Running</div><div class="value" id="running">-</div></div>
-  <div class="card"><div class="label">Successful (24h)</div><div class="value" id="successful">-</div></div>
-  <div class="card"><div class="label">Failed (24h)</div><div class="value" id="failed">-</div></div>
-  <div class="card"><div class="label">Upcoming (Active)</div><div class="value" id="upcoming">-</div></div>
+  <div class="card" onclick="loadDetails('running')"><div class="label">Running</div><div class="value" id="running">-</div></div>
+  <div class="card" onclick="loadDetails('successful')"><div class="label">Successful (24h)</div><div class="value" id="successful">-</div></div>
+  <div class="card" onclick="loadDetails('failed')"><div class="label">Failed (24h)</div><div class="value" id="failed">-</div></div>
+  <div class="card" onclick="loadDetails('upcoming')"><div class="label">Upcoming (Active)</div><div class="value" id="upcoming">-</div></div>
 </div>
+<div id="msg"></div>
 <div class="panel">
-  <p>Admin configures reports. Worker + Hangfire execute them independently against the shared SQL database.</p>
+  <div style="display:flex; justify-content:space-between; gap:1rem; align-items:center;">
+    <h3 id="detailTitle">Running Details</h3>
+    <button class="secondary" onclick="refreshDashboard()">Refresh</button>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Execution</th>
+        <th>Report</th>
+        <th>Customer</th>
+        <th>Status</th>
+        <th>Started</th>
+        <th>Completed</th>
+        <th>Records</th>
+        <th>Files</th>
+        <th>Error / Schedule</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody id="detailRows"></tbody>
+  </table>
 </div>
 @section Scripts {
 <script>
-api.get('/api/dashboard').then(d => {
+let selectedCategory = 'running';
+
+function statusBadge(status) {
+  return `<span class="badge ${String(status || '').toLowerCase()}">${status || '-'}</span>`;
+}
+
+function formatDate(value) {
+  return value ? new Date(value).toLocaleString() : '-';
+}
+
+async function refreshDashboard() {
+  const d = await api.get('/api/dashboard');
   running.textContent = d.runningReports;
   successful.textContent = d.successfulReports;
   failed.textContent = d.failedReports;
   upcoming.textContent = d.upcomingReports;
-}).catch(e => showMsg(Object.assign(document.createElement('div'), {}), e.message, false));
+  await loadDetails(selectedCategory);
+}
+
+async function loadDetails(category) {
+  selectedCategory = category;
+  detailTitle.textContent = `${category.charAt(0).toUpperCase()}${category.slice(1)} Details`;
+  try {
+    const items = await api.get('/api/dashboard/' + category);
+    if (items.length === 0) {
+      detailRows.innerHTML = '<tr><td colspan="10">No records found.</td></tr>';
+      return;
+    }
+
+    detailRows.innerHTML = items.map(x => `<tr>
+      <td>${x.executionId ? '#' + x.executionId : '-'}</td>
+      <td><strong>${x.reportName}</strong><br/><code>${x.reportCode}</code></td>
+      <td>${x.customerName || '-'}</td>
+      <td>${statusBadge(x.status)}</td>
+      <td>${formatDate(x.startedAt || x.scheduledTime)}</td>
+      <td>${formatDate(x.completedAt)}</td>
+      <td>${x.recordCount ?? '-'}</td>
+      <td>${x.fileCount ?? '-'}</td>
+      <td>${x.errorMessage || '-'}</td>
+      <td>
+        ${x.executionId ? `<a class="btn secondary" href="/Executions" onclick="sessionStorage.setItem('executionToInspect','${x.executionId}')">Inspect</a>` : ''}
+        <a class="btn secondary" href="/Reports">Reports</a>
+      </td>
+    </tr>`).join('');
+  } catch(e) {
+    showMsg(msg, e.message, false);
+  }
+}
+
+refreshDashboard().catch(e => showMsg(msg, e.message, false));
 </script>
 }

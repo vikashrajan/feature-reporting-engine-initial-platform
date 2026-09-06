@@ -1,6 +1,8 @@
 using Hangfire;
 using Hangfire.SqlServer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -77,6 +79,8 @@ public static class DependencyInjection
         services.AddScoped<IDeliveryProvider, SftpDeliveryProvider>();
         services.AddScoped<IDeliveryProvider, FtpDeliveryProvider>();
         services.AddScoped<IDeliveryProvider, BlobDeliveryProvider>();
+        services.AddScoped<IDeliveryProvider, AzureFileShareDeliveryProvider>();
+        services.AddScoped<IDeliveryProvider, S3DeliveryProvider>();
         services.AddScoped<IDeliveryProviderResolver, DeliveryProviderResolver>();
 
         services.AddScoped<IParameterResolver, ParameterResolver>();
@@ -131,9 +135,63 @@ public static class DependencyInjection
 
     public static async Task InitializeDatabaseAsync(this IServiceProvider services, CancellationToken cancellationToken = default)
     {
+        // Pre-create output directories so they always exist at fixed known locations
+        Directory.CreateDirectory(@"C:\ReportingEngineOutput\temp-reports");
+        Directory.CreateDirectory(@"C:\ReportingEngineOutput\temp-emails");
+
         using var scope = services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ReportingEngineDbContext>();
-        await db.Database.MigrateAsync(cancellationToken);
+        var databaseCreator = db.Database.GetService<IRelationalDatabaseCreator>();
+        if (!await databaseCreator.ExistsAsync(cancellationToken))
+        {
+            await databaseCreator.CreateAsync(cancellationToken);
+        }
+
+        var tableExists = false;
+        try
+        {
+            var conn = db.Database.GetDbConnection();
+            if (conn.State != System.Data.ConnectionState.Open)
+            {
+                await conn.OpenAsync(cancellationToken);
+            }
+
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText = "SELECT COUNT(*) FROM sys.tables WHERE name = 'RepScdhedularProject_Customer'";
+            var count = Convert.ToInt32(await cmd.ExecuteScalarAsync(cancellationToken));
+            tableExists = count > 0;
+        }
+        catch
+        {
+            tableExists = false;
+        }
+
+        if (!tableExists)
+        {
+            var script = db.Database.GenerateCreateScript();
+            var batches = script.Split(new[] { "\nGO\n", "\r\nGO\r\n", "GO\n", "GO\r\n" }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            foreach (var batch in batches)
+            {
+                if (!string.IsNullOrWhiteSpace(batch))
+                {
+                    await db.Database.ExecuteSqlRawAsync(batch, cancellationToken);
+                }
+            }
+        }
+        else
+        {
+            await db.Database.ExecuteSqlRawAsync("""
+                IF COL_LENGTH('RepScdhedularProject_FileConfiguration', 'ZipBatchSize') IS NULL
+                BEGIN
+                    ALTER TABLE RepScdhedularProject_FileConfiguration ADD ZipBatchSize int NULL
+                END
+
+                IF COL_LENGTH('RepScdhedularProject_FileConfiguration', 'KeepLocalFiles') IS NULL
+                BEGIN
+                    ALTER TABLE RepScdhedularProject_FileConfiguration ADD KeepLocalFiles bit NOT NULL CONSTRAINT DF_RepScdhedularProject_FileConfiguration_KeepLocalFiles DEFAULT(1)
+                END
+                """, cancellationToken);
+        }
 
         var seedOptions = scope.ServiceProvider.GetRequiredService<IOptions<SeedOptions>>().Value;
         if (seedOptions.Enabled)

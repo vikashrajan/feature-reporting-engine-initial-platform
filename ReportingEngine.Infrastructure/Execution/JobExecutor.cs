@@ -26,6 +26,7 @@ public sealed class JobExecutor : IJobExecutor
     private readonly IAuditService _auditService;
     private readonly ExecutionOptions _executionOptions;
     private readonly RetryOptions _retryOptions;
+    private readonly EmailOptions _emailOptions;
     private readonly ILogger<JobExecutor> _logger;
 
     public JobExecutor(
@@ -42,6 +43,7 @@ public sealed class JobExecutor : IJobExecutor
         IAuditService auditService,
         IOptions<ExecutionOptions> executionOptions,
         IOptions<RetryOptions> retryOptions,
+        IOptions<EmailOptions> emailOptions,
         ILogger<JobExecutor> logger)
     {
         _reportRepository = reportRepository;
@@ -57,6 +59,7 @@ public sealed class JobExecutor : IJobExecutor
         _auditService = auditService;
         _executionOptions = executionOptions.Value;
         _retryOptions = retryOptions.Value;
+        _emailOptions = emailOptions.Value;
         _logger = logger;
     }
 
@@ -117,6 +120,11 @@ public sealed class JobExecutor : IJobExecutor
                 execution.RecordCount = execution.Files.Sum(f => f.RecordCount ?? 0);
                 await _executionRepository.UpdateAsync(execution, cancellationToken);
                 await _unitOfWork.SaveChangesAsync(cancellationToken);
+                if (!report.FileConfiguration.KeepLocalFiles)
+                {
+                    DeleteLocalFiles(execution.Files.Where(f => f.FilePath is not null).Select(f => f.FilePath!), BuildOutputDirectory(report, execution));
+                    await ClearLocalFilePathsAsync(execution.ExecutionId, cancellationToken);
+                }
                 _logger.LogInformation("Recovered already-delivered execution {ExecutionId} without re-delivery", execution.ExecutionId);
                 return;
             }
@@ -131,10 +139,7 @@ public sealed class JobExecutor : IJobExecutor
                 parameters,
                 cancellationToken);
 
-            var outputDirectory = Path.Combine(
-                _executionOptions.TemporaryFilePath,
-                report.ReportCode,
-                execution.ExecutionId.ToString());
+            var outputDirectory = BuildOutputDirectory(report, execution);
 
             var tokenContext = new FileNameTokenContext(
                 report.Customer.CustomerCode,
@@ -154,20 +159,16 @@ public sealed class JobExecutor : IJobExecutor
                 report.FileConfiguration.SplitValue,
                 cancellationToken);
 
-            var deliveryPaths = new List<string>();
             var sequence = 1;
+            var uncompressedFilePaths = new List<string>();
+            var deliveredAttachmentPaths = new List<string>();
+            var generatedFileBatches = new List<(int SequenceNumber, string FilePath, long RecordCount)>();
+
             foreach (var generated in generatedFiles)
             {
                 var path = generated.FilePath;
-                if (!string.IsNullOrWhiteSpace(report.FileConfiguration.CompressionType))
-                {
-                    path = await _fileCompressor.CompressAsync(path, report.FileConfiguration.CompressionType, cancellationToken);
-                }
-
-                if (report.FileConfiguration.EncryptionEnabled)
-                {
-                    _logger.LogWarning("EncryptionEnabled is true but encryption provider is not configured; delivering unencrypted file.");
-                }
+                uncompressedFilePaths.Add(path);
+                generatedFileBatches.Add((sequence, path, generated.RecordCount));
 
                 var fileExecution = execution.Files.FirstOrDefault(f => f.SequenceNumber == sequence);
                 if (fileExecution is null)
@@ -198,46 +199,43 @@ public sealed class JobExecutor : IJobExecutor
                     await _fileExecutionRepository.UpdateAsync(fileExecution, cancellationToken);
                 }
 
-                if (fileExecution.DeliveryStatus != FileDeliveryStatuses.Delivered)
-                {
-                    deliveryPaths.Add(path);
-                }
-
                 sequence++;
             }
 
             await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-            if (deliveryPaths.Count > 0)
+            if (!string.IsNullOrWhiteSpace(report.FileConfiguration.CompressionType) &&
+                string.Equals(report.FileConfiguration.CompressionType.Trim(), CompressionTypes.Zip, StringComparison.OrdinalIgnoreCase))
             {
-                var deliveryProvider = _deliveryProviderResolver.Resolve(report.DeliveryConfiguration.DeliveryType);
-                await deliveryProvider.DeliverAsync(new DeliveryRequest
-                {
-                    DeliveryType = report.DeliveryConfiguration.DeliveryType,
-                    DestinationReference = report.DeliveryConfiguration.DestinationReference,
-                    SecretReference = report.DeliveryConfiguration.SecretReference,
-                    EmailTo = report.DeliveryConfiguration.EmailTo,
-                    EmailCc = report.DeliveryConfiguration.EmailCc,
-                    EmailBcc = report.DeliveryConfiguration.EmailBcc,
-                    EmailSubjectTemplate = report.DeliveryConfiguration.EmailSubjectTemplate,
-                    EmailBodyTemplate = report.DeliveryConfiguration.EmailBodyTemplate,
-                    AttachmentPaths = deliveryPaths,
-                    Tokens = new DeliveryTokenContext(
-                        report.Customer.CustomerCode,
-                        report.ReportCode,
-                        currentExecutionUtc,
-                        generatedFiles.Sum(f => f.RecordCount),
-                        generatedFiles.Count)
-                }, cancellationToken);
+                var zipBatchSize = report.FileConfiguration.ZipBatchSize.GetValueOrDefault();
+                var zipBatches = zipBatchSize > 0
+                    ? generatedFileBatches.Chunk(zipBatchSize).ToList()
+                    : new[] { generatedFileBatches.ToArray() }.ToList();
 
-                var files = await _fileExecutionRepository.GetByExecutionIdAsync(execution.ExecutionId, cancellationToken);
-                foreach (var file in files)
+                var batchNumber = 1;
+                foreach (var batch in zipBatches)
                 {
-                    file.DeliveryStatus = FileDeliveryStatuses.Delivered;
-                    await _fileExecutionRepository.UpdateAsync(file, cancellationToken);
+                    var zipFileName = zipBatches.Count == 1
+                        ? $"{report.ReportCode}_{report.Customer.CustomerCode}_{execution.ExecutionId}_{currentExecutionUtc:yyyyMMddHHmmss}.zip"
+                        : $"{report.ReportCode}_{report.Customer.CustomerCode}_{execution.ExecutionId}_{currentExecutionUtc:yyyyMMddHHmmss}_batch{batchNumber:000}.zip";
+                    var zipPath = Path.Combine(outputDirectory, zipFileName);
+                    await _fileCompressor.CompressMultipleAsync(batch.Select(f => f.FilePath), zipPath, cancellationToken);
+                    deliveredAttachmentPaths.Add(zipPath);
+                    _logger.LogInformation(
+                        "Zipped generated files {FirstSequence}-{LastSequence} into archive {ZipPath}",
+                        batch.Min(f => f.SequenceNumber),
+                        batch.Max(f => f.SequenceNumber),
+                        zipPath);
+
+                    await DeliverAsync(report, currentExecutionUtc, new[] { zipPath }, batch.Sum(f => f.RecordCount), batch.Length, cancellationToken);
+                    await MarkFilesDeliveredAsync(execution.ExecutionId, batch.Select(f => f.SequenceNumber).ToHashSet(), cancellationToken);
+                    batchNumber++;
                 }
-
-                await _unitOfWork.SaveChangesAsync(cancellationToken);
+            }
+            else
+            {
+                await DeliverAsync(report, currentExecutionUtc, uncompressedFilePaths, generatedFiles.Sum(f => f.RecordCount), generatedFiles.Count, cancellationToken);
+                await MarkFilesDeliveredAsync(execution.ExecutionId, generatedFileBatches.Select(f => f.SequenceNumber).ToHashSet(), cancellationToken);
             }
 
             execution.Status = JobExecutionStatuses.Success;
@@ -248,6 +246,12 @@ public sealed class JobExecutor : IJobExecutor
             execution.ErrorMessage = null;
             await _executionRepository.UpdateAsync(execution, cancellationToken);
             await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+            if (!report.FileConfiguration.KeepLocalFiles)
+            {
+                DeleteLocalFiles(uncompressedFilePaths.Concat(deliveredAttachmentPaths), outputDirectory);
+                await ClearLocalFilePathsAsync(execution.ExecutionId, cancellationToken);
+            }
 
             var durationMs = (execution.CompletedAt.Value - execution.StartedAt!.Value).TotalMilliseconds;
             _logger.LogInformation(
@@ -280,6 +284,7 @@ public sealed class JobExecutor : IJobExecutor
             await _unitOfWork.SaveChangesAsync(cancellationToken);
             _logger.LogError(ex, "Execution failed permanently. Status=FAILED RetryCount={RetryCount}", execution.RetryCount);
             await _auditService.WriteAsync("JobExecution", execution.ExecutionId, "FAILED", "system", newValue: new { ex.Message }, cancellationToken: cancellationToken);
+            await SendFailureNotificationAsync(execution, ex, cancellationToken);
 
             if (!isTransient)
             {
@@ -289,6 +294,200 @@ public sealed class JobExecutor : IJobExecutor
 
             throw;
         }
+    }
+
+    private async Task DeliverAsync(
+        ReportDefinition report,
+        DateTime executionDateUtc,
+        IReadOnlyList<string> attachmentPaths,
+        long recordCount,
+        int fileCount,
+        CancellationToken cancellationToken)
+    {
+        if (attachmentPaths.Count == 0)
+        {
+            return;
+        }
+
+        var deliveryProvider = _deliveryProviderResolver.Resolve(report.DeliveryConfiguration.DeliveryType);
+        await deliveryProvider.DeliverAsync(new DeliveryRequest
+        {
+            DeliveryType = report.DeliveryConfiguration.DeliveryType,
+            DestinationReference = report.DeliveryConfiguration.DestinationReference,
+            SecretReference = report.DeliveryConfiguration.SecretReference,
+            EmailTo = report.DeliveryConfiguration.EmailTo,
+            EmailCc = report.DeliveryConfiguration.EmailCc,
+            EmailBcc = report.DeliveryConfiguration.EmailBcc,
+            EmailSubjectTemplate = report.DeliveryConfiguration.EmailSubjectTemplate,
+            EmailBodyTemplate = report.DeliveryConfiguration.EmailBodyTemplate,
+            AttachmentPaths = attachmentPaths,
+            Tokens = new DeliveryTokenContext(
+                report.Customer.CustomerCode,
+                report.ReportCode,
+                executionDateUtc,
+                recordCount,
+                fileCount)
+        }, cancellationToken);
+    }
+
+    private async Task SendFailureNotificationAsync(JobExecution execution, Exception error, CancellationToken cancellationToken)
+    {
+        if (!_emailOptions.FailureNotificationEnabled || string.IsNullOrWhiteSpace(_emailOptions.FailureNotificationTo))
+        {
+            return;
+        }
+
+        ReportDefinition? report = null;
+        try
+        {
+            report = await _reportRepository.GetByIdWithDetailsAsync(execution.ReportId, cancellationToken);
+        }
+        catch (Exception lookupError) when (lookupError is not OperationCanceledException)
+        {
+            _logger.LogWarning(lookupError, "Could not load report details for failure notification on execution {ExecutionId}", execution.ExecutionId);
+        }
+
+        try
+        {
+            var deliveryProvider = _deliveryProviderResolver.Resolve(DeliveryTypes.Email);
+            await deliveryProvider.DeliverAsync(new DeliveryRequest
+            {
+                DeliveryType = DeliveryTypes.Email,
+                EmailTo = _emailOptions.FailureNotificationTo,
+                EmailCc = _emailOptions.FailureNotificationCc,
+                EmailSubjectTemplate = _emailOptions.FailureNotificationSubjectTemplate,
+                EmailBodyTemplate = _emailOptions.FailureNotificationBodyTemplate,
+                AttachmentPaths = Array.Empty<string>(),
+                Tokens = new DeliveryTokenContext(
+                    report?.Customer?.CustomerCode ?? string.Empty,
+                    report?.ReportCode ?? execution.ReportId.ToString(),
+                    DateTime.UtcNow,
+                    execution.RecordCount ?? 0,
+                    execution.FileCount ?? 0,
+                    execution.ExecutionId,
+                    execution.Status,
+                    error.Message)
+            }, cancellationToken);
+        }
+        catch (Exception notificationError) when (notificationError is not OperationCanceledException)
+        {
+            _logger.LogWarning(notificationError, "Could not send failure notification email for execution {ExecutionId}", execution.ExecutionId);
+        }
+    }
+
+    private async Task MarkFilesDeliveredAsync(long executionId, HashSet<int> sequenceNumbers, CancellationToken cancellationToken)
+    {
+        if (sequenceNumbers.Count == 0)
+        {
+            return;
+        }
+
+        var files = await _fileExecutionRepository.GetByExecutionIdAsync(executionId, cancellationToken);
+        foreach (var file in files.Where(f => sequenceNumbers.Contains(f.SequenceNumber)))
+        {
+            file.DeliveryStatus = FileDeliveryStatuses.Delivered;
+            await _fileExecutionRepository.UpdateAsync(file, cancellationToken);
+        }
+
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task ClearLocalFilePathsAsync(long executionId, CancellationToken cancellationToken)
+    {
+        var files = await _fileExecutionRepository.GetByExecutionIdAsync(executionId, cancellationToken);
+        foreach (var file in files.Where(f => !string.IsNullOrWhiteSpace(f.FilePath)))
+        {
+            file.FilePath = null;
+            await _fileExecutionRepository.UpdateAsync(file, cancellationToken);
+        }
+
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+    }
+
+    private void DeleteLocalFiles(IEnumerable<string> filePaths, string outputDirectory)
+    {
+        var root = Path.GetFullPath(outputDirectory);
+        var filesToDelete = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var filePath in filePaths.Where(p => !string.IsNullOrWhiteSpace(p)))
+        {
+            filesToDelete.Add(filePath);
+        }
+
+        try
+        {
+            var tempRoot = Path.GetFullPath(_executionOptions.TemporaryFilePath);
+            if (Directory.Exists(root)
+                && IsPathInside(root, tempRoot)
+                && !string.Equals(root, tempRoot, StringComparison.OrdinalIgnoreCase))
+            {
+                foreach (var file in Directory.EnumerateFiles(root, "*", SearchOption.TopDirectoryOnly))
+                {
+                    filesToDelete.Add(file);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Could not enumerate local execution output directory {OutputDirectory}", outputDirectory);
+        }
+
+        foreach (var filePath in filesToDelete)
+        {
+            try
+            {
+                var fullPath = Path.GetFullPath(filePath);
+                if (!IsPathInside(fullPath, root))
+                {
+                    _logger.LogWarning("Skipped local cleanup outside execution directory: {FilePath}", filePath);
+                    continue;
+                }
+
+                if (File.Exists(fullPath))
+                {
+                    File.Delete(fullPath);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Could not delete local generated file {FilePath}", filePath);
+            }
+        }
+
+        TryDeleteEmptyOutputDirectory(root);
+    }
+
+    private string BuildOutputDirectory(ReportDefinition report, JobExecution execution) =>
+        Path.Combine(_executionOptions.TemporaryFilePath, report.ReportCode, execution.ExecutionId.ToString());
+
+    private void TryDeleteEmptyOutputDirectory(string outputDirectory)
+    {
+        try
+        {
+            var tempRoot = Path.GetFullPath(_executionOptions.TemporaryFilePath);
+            if (!IsPathInside(outputDirectory, tempRoot) || string.Equals(outputDirectory, tempRoot, StringComparison.OrdinalIgnoreCase))
+            {
+                _logger.LogWarning("Skipped local cleanup outside report temp root: {OutputDirectory}", outputDirectory);
+                return;
+            }
+
+            if (Directory.Exists(outputDirectory) && !Directory.EnumerateFileSystemEntries(outputDirectory).Any())
+            {
+                Directory.Delete(outputDirectory, recursive: false);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Could not delete empty local execution output directory {OutputDirectory}", outputDirectory);
+        }
+    }
+
+    private static bool IsPathInside(string childPath, string parentPath)
+    {
+        var relative = Path.GetRelativePath(parentPath, childPath);
+        return relative != "."
+            && !relative.StartsWith("..", StringComparison.Ordinal)
+            && !Path.IsPathRooted(relative);
     }
 
     private static bool IsTransient(Exception ex) =>

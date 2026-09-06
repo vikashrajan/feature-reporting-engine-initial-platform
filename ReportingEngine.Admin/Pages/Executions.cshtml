@@ -1,19 +1,132 @@
 @page
 @model ReportingEngine.Admin.Pages.ExecutionsModel
-<h1>Executions</h1>
+<h1>Job Executions Monitor</h1>
 <div id="msg"></div>
+
 <div class="panel">
-  <label>ExecutionId</label>
-  <input id="eId" type="number" />
-  <button onclick="loadOne()">Load</button>
-  <button onclick="retryOne()">Retry</button>
-  <button class="danger" onclick="cancelOne()">Cancel</button>
-  <pre id="detail"></pre>
+  <h3>Select Configured Report</h3>
+  <div style="display:flex; gap:0.75rem; align-items:center; margin-bottom:0.75rem;">
+    <div style="flex:1;"><label>Report Name</label><select id="reportCombo" onchange="loadReportExecutions()"><option value="">-- Select Report --</option></select></div>
+    <div style="margin-top:1.25rem;"><button onclick="loadReportExecutions()">Refresh Executions</button></div>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Execution ID</th>
+        <th>Status</th>
+        <th>Started At</th>
+        <th>Completed At</th>
+        <th>Record Count</th>
+        <th>File Count</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody id="execRows"></tbody>
+  </table>
 </div>
+
+<div class="panel">
+  <h3>Execution Details Inspector</h3>
+  <div class="grid-2">
+    <div><label>Execution ID</label><input id="eId" type="number" placeholder="e.g. 1" /></div>
+    <div style="margin-top:1.25rem;">
+      <button onclick="loadOne()">Load Details</button>
+      <button class="secondary" onclick="retryOne()">Retry Job</button>
+      <button class="danger" onclick="cancelOne()">Cancel Execution</button>
+    </div>
+  </div>
+  <pre id="detail" style="background:#0f172a; color:#f8fafc; padding:1rem; border-radius:6px; overflow-x:auto; margin-top:1rem; max-height:400px;"></pre>
+</div>
+
 @section Scripts {
 <script>
-async function loadOne(){ try{ const x=await api.get('/api/executions/'+eId.value); detail.textContent=JSON.stringify(x,null,2); showMsg(msg,'Loaded',true);} catch(e){ showMsg(msg,e.message,false);} }
-async function retryOne(){ try{ await api.send('/api/executions/'+eId.value+'/retry','POST'); showMsg(msg,'Retry queued',true);} catch(e){ showMsg(msg,e.message,false);} }
-async function cancelOne(){ try{ await api.send('/api/executions/'+eId.value+'/cancel','POST'); showMsg(msg,'Cancelled',true);} catch(e){ showMsg(msg,e.message,false);} }
+async function initReportsCombo() {
+  try {
+    const reports = await api.get('/api/reports');
+    reportCombo.innerHTML = '<option value="">-- Select Report --</option>' +
+      reports.map(r => `<option value="${r.reportId}">${r.reportName} (${r.reportCode}) - [Customer: ${r.customerName || r.customerId}]</option>`).join('');
+    if (reports.length > 0) {
+      reportCombo.value = reports[0].reportId;
+      await loadReportExecutions();
+    }
+  } catch(e) {
+    showMsg(msg, 'Error loading reports: ' + e.message, false);
+  }
+}
+
+async function loadReportExecutions() {
+  const reportId = reportCombo.value;
+  if (!reportId) {
+    execRows.innerHTML = '<tr><td colspan="7">Please select a report above.</td></tr>';
+    return;
+  }
+  try {
+    const items = await api.get('/api/reports/' + reportId + '/executions');
+    if (items.length === 0) {
+      execRows.innerHTML = '<tr><td colspan="7">No execution records found for this report. Click "Run Now" in Reports tab to execute.</td></tr>';
+      return;
+    }
+    execRows.innerHTML = items.map(x => `<tr>
+      <td><strong>#${x.executionId}</strong></td>
+      <td><span class="badge ${x.status.toLowerCase()}">${x.status}</span></td>
+      <td>${x.startedAt ? new Date(x.startedAt).toLocaleString() : '-'}</td>
+      <td>${x.completedAt ? new Date(x.completedAt).toLocaleString() : '-'}</td>
+      <td>${x.recordCount ?? '-'}</td>
+      <td>${x.fileCount ?? '-'}</td>
+      <td>
+        <button class="secondary" onclick="inspectExecution(${x.executionId})">Inspect</button>
+        <button onclick="retryExecution(${x.executionId})">Retry</button>
+      </td>
+    </tr>`).join('');
+  } catch(e) {
+    showMsg(msg, 'Failed to load executions: ' + e.message, false);
+  }
+}
+
+async function inspectExecution(id) {
+  eId.value = id;
+  await loadOne();
+}
+
+async function retryExecution(id) {
+  eId.value = id;
+  await retryOne();
+}
+
+async function loadOne(){ 
+  try{ 
+    if (!eId.value) throw new Error("Enter or select Execution ID.");
+    const x=await api.get('/api/executions/'+eId.value); 
+    detail.textContent=JSON.stringify(x,null,2); 
+    showMsg(msg,'Loaded details for Execution #' + eId.value,true);
+  } catch(e){ showMsg(msg,e.message,false);} 
+}
+
+async function retryOne(){ 
+  try{ 
+    if (!eId.value) throw new Error("Enter or select Execution ID.");
+    await api.send('/api/executions/'+eId.value+'/retry','POST'); 
+    showMsg(msg,'Retry queued for Execution #' + eId.value,true);
+    await loadReportExecutions();
+  } catch(e){ showMsg(msg,e.message,false);} 
+}
+
+async function cancelOne(){ 
+  try{ 
+    if (!eId.value) throw new Error("Enter or select Execution ID.");
+    await api.send('/api/executions/'+eId.value+'/cancel','POST'); 
+    showMsg(msg,'Cancelled Execution #' + eId.value,true);
+    await loadReportExecutions();
+  } catch(e){ showMsg(msg,e.message,false);} 
+}
+
+initReportsCombo().then(async () => {
+  const executionToInspect = sessionStorage.getItem('executionToInspect');
+  if (executionToInspect) {
+    sessionStorage.removeItem('executionToInspect');
+    eId.value = executionToInspect;
+    await loadOne();
+  }
+});
 </script>
 }

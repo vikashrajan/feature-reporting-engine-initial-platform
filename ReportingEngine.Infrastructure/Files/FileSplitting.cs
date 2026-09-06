@@ -34,6 +34,31 @@ public sealed class FileCompressor : IFileCompressor
         };
     }
 
+    public Task<string> CompressMultipleAsync(IEnumerable<string> sourceFilePaths, string zipDestinationPath, CancellationToken cancellationToken = default)
+    {
+        var dir = Path.GetDirectoryName(zipDestinationPath);
+        if (!string.IsNullOrEmpty(dir))
+        {
+            Directory.CreateDirectory(dir);
+        }
+
+        if (File.Exists(zipDestinationPath))
+        {
+            File.Delete(zipDestinationPath);
+        }
+
+        using var archive = ZipFile.Open(zipDestinationPath, ZipArchiveMode.Create);
+        foreach (var file in sourceFilePaths)
+        {
+            if (File.Exists(file))
+            {
+                archive.CreateEntryFromFile(file, Path.GetFileName(file), CompressionLevel.Optimal);
+            }
+        }
+
+        return Task.FromResult(zipDestinationPath);
+    }
+
     private static string CompressZip(string sourceFilePath)
     {
         var zipPath = sourceFilePath + ".zip";

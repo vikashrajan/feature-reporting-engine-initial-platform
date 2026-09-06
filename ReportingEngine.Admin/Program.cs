@@ -4,8 +4,25 @@ using Microsoft.EntityFrameworkCore;
 using ReportingEngine.Application.DTOs;
 using ReportingEngine.Application.Services;
 using ReportingEngine.Infrastructure;
+using Serilog;
+using Serilog.Events;
+
+// Bootstrap Serilog early so startup errors are captured too
+Log.Logger = new LoggerConfiguration()
+    .MinimumLevel.Information()
+    .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
+    .MinimumLevel.Override("Hangfire", LogEventLevel.Information)
+    .Enrich.FromLogContext()
+    .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {SourceContext}: {Message:lj}{NewLine}{Exception}")
+    .WriteTo.File(
+        path: @"C:\ReportingEngineOutput\logs\admin-.log",
+        rollingInterval: RollingInterval.Day,
+        retainedFileCountLimit: 14,
+        outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {SourceContext}: {Message:lj}{NewLine}{Exception}")
+    .CreateLogger();
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Host.UseSerilog();
 
 builder.Services.AddInfrastructure(builder.Configuration, enableHangfireServer: false);
 builder.Services.AddEndpointsApiExplorer();

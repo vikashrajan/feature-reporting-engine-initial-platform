@@ -12,9 +12,9 @@ public sealed record ScheduleDto(long ScheduleId, string ScheduleName, string Sc
 public sealed record CreateScheduleRequest(string ScheduleName, string ScheduleType, string? CronExpression, string TimeZoneId, DateTime? StartDate, DateTime? EndDate);
 public sealed record UpdateScheduleRequest(string ScheduleName, string ScheduleType, string? CronExpression, string TimeZoneId, DateTime? StartDate, DateTime? EndDate, bool IsActive);
 
-public sealed record FileConfigurationDto(long FileConfigId, string ConfigurationName, string FileFormat, string FileNamePattern, bool SplitEnabled, string? SplitType, long? SplitValue, string? CompressionType, bool EncryptionEnabled);
-public sealed record CreateFileConfigurationRequest(string ConfigurationName, string FileFormat, string FileNamePattern, bool SplitEnabled, string? SplitType, long? SplitValue, string? CompressionType, bool EncryptionEnabled);
-public sealed record UpdateFileConfigurationRequest(string ConfigurationName, string FileFormat, string FileNamePattern, bool SplitEnabled, string? SplitType, long? SplitValue, string? CompressionType, bool EncryptionEnabled);
+public sealed record FileConfigurationDto(long FileConfigId, string ConfigurationName, string FileFormat, string FileNamePattern, bool SplitEnabled, string? SplitType, long? SplitValue, string? CompressionType, int? ZipBatchSize, bool KeepLocalFiles, bool EncryptionEnabled);
+public sealed record CreateFileConfigurationRequest(string ConfigurationName, string FileFormat, string FileNamePattern, bool SplitEnabled, string? SplitType, long? SplitValue, string? CompressionType, int? ZipBatchSize, bool KeepLocalFiles, bool EncryptionEnabled);
+public sealed record UpdateFileConfigurationRequest(string ConfigurationName, string FileFormat, string FileNamePattern, bool SplitEnabled, string? SplitType, long? SplitValue, string? CompressionType, int? ZipBatchSize, bool KeepLocalFiles, bool EncryptionEnabled);
 
 public sealed record DeliveryConfigurationDto(long DeliveryConfigId, string DeliveryName, string DeliveryType, string? DestinationReference, string? EmailTo, string? EmailCc, string? EmailBcc, string? EmailSubjectTemplate, string? EmailBodyTemplate, string? SecretReference, bool IsActive);
 public sealed record CreateDeliveryConfigurationRequest(string DeliveryName, string DeliveryType, string? DestinationReference, string? EmailTo, string? EmailCc, string? EmailBcc, string? EmailSubjectTemplate, string? EmailBodyTemplate, string? SecretReference);
@@ -37,7 +37,12 @@ public sealed record ReportDto(
     int VersionNumber,
     string Status,
     bool IsActive,
-    IReadOnlyList<ReportParameterDto> Parameters);
+    IReadOnlyList<ReportParameterDto> Parameters,
+    string? CustomerName = null,
+    string? DataSourceName = null,
+    string? ScheduleName = null,
+    string? FileConfigName = null,
+    string? DeliveryConfigName = null);
 
 public sealed record CreateReportRequest(
     long CustomerId,
@@ -78,3 +83,60 @@ public sealed record JobExecutionDto(
     IReadOnlyList<FileExecutionDto> Files);
 
 public sealed record DashboardDto(int RunningReports, int SuccessfulReports, int FailedReports, int UpcomingReports);
+public sealed record DashboardDetailDto(
+    long? ExecutionId,
+    long ReportId,
+    string ReportCode,
+    string ReportName,
+    string? CustomerName,
+    string Status,
+    DateTime? ScheduledTime,
+    DateTime? StartedAt,
+    DateTime? CompletedAt,
+    long? RecordCount,
+    int? FileCount,
+    string? ErrorMessage);
+
+public sealed record EmailSettingsDto(
+    string Host,
+    int Port,
+    bool EnableSsl,
+    string FromAddress,
+    string FromDisplayName,
+    string? UserName,
+    bool HasPassword,
+    int SmtpTimeoutSeconds,
+    bool UseFileDrop,
+    string FileDropPath,
+    bool FailureNotificationEnabled,
+    string? FailureNotificationTo,
+    string? FailureNotificationCc,
+    string? FailureNotificationSubjectTemplate,
+    string? FailureNotificationBodyTemplate);
+
+public sealed record UpdateEmailSettingsRequest(
+    string Host,
+    int Port,
+    bool EnableSsl,
+    string FromAddress,
+    string FromDisplayName,
+    string? UserName,
+    string? Password,
+    int SmtpTimeoutSeconds,
+    bool UseFileDrop,
+    string FileDropPath,
+    bool FailureNotificationEnabled,
+    string? FailureNotificationTo,
+    string? FailureNotificationCc,
+    string? FailureNotificationSubjectTemplate,
+    string? FailureNotificationBodyTemplate);
+
+public sealed record TestEmailRequest(
+    string RecipientEmail,
+    string? CustomSubject,
+    string? CustomBody);
+
+public sealed record TestSftpRequest(
+    string? DestinationReference,
+    string? SecretReference);
+

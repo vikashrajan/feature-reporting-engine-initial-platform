@@ -46,4 +46,5 @@ public sealed record FileNameTokenContext(
 public interface IFileCompressor
 {
     Task<string> CompressAsync(string sourceFilePath, string compressionType, CancellationToken cancellationToken = default);
+    Task<string> CompressMultipleAsync(IEnumerable<string> sourceFilePaths, string zipDestinationPath, CancellationToken cancellationToken = default);
 }

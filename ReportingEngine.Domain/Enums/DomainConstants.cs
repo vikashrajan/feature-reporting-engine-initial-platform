@@ -46,6 +46,8 @@ public static class DeliveryTypes
     public const string Ftp = "FTP";
     public const string SharedFolder = "SHARED_FOLDER";
     public const string Blob = "BLOB";
+    public const string AzureFileShare = "AZURE_FILE_SHARE";
+    public const string S3 = "S3";
 }
 
 public static class ReportStatuses

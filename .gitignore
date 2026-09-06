@@ -15,6 +15,7 @@ x86/
 temp-reports/
 temp-emails/
 delivered-reports/
+tmp/
 *.log
 
 ## IDE / OS

@@ -73,11 +73,23 @@ public static class DatabaseSeeder
             CreatedDate = DateTime.UtcNow
         };
 
+        var sftpDelivery = new DeliveryConfiguration
+        {
+            DeliveryName = "Demo SFTP Storage",
+            DeliveryType = DeliveryTypes.Sftp,
+            DestinationReference = "./delivered-sftp/reports",
+            SecretReference = "Host=localhost;Port=22;Username=sftpuser;Password=sftppass;UseFileDrop=true",
+            IsActive = true,
+            CreatedBy = "seed",
+            CreatedDate = DateTime.UtcNow
+        };
+
         db.Customers.Add(customer);
         db.DataSources.Add(dataSource);
         db.Schedules.Add(schedule);
         db.FileConfigurations.Add(fileConfig);
         db.DeliveryConfigurations.Add(delivery);
+        db.DeliveryConfigurations.Add(sftpDelivery);
         await db.SaveChangesAsync(cancellationToken);
 
         var report = new ReportDefinition

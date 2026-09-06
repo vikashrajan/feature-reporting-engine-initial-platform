@@ -210,6 +210,27 @@ public sealed class ReportService : IReportService
         return executions.Select(ExecutionMappings.Map).ToList();
     }
 
+    public async Task DeleteAsync(long id, string performedBy, CancellationToken cancellationToken = default)
+    {
+        var entity = await _reportRepository.GetByIdWithDetailsAsync(id, cancellationToken)
+            ?? throw new KeyNotFoundException($"Report {id} was not found.");
+
+        if (await _reportRepository.HasExecutionsAsync(id, cancellationToken))
+        {
+            throw new InvalidOperationException("Cannot delete this report because it has execution history. Pause or retire it instead.");
+        }
+
+        if (entity.Status == ReportStatuses.Active)
+        {
+            await _scheduleSync.RemoveReportScheduleAsync(id, cancellationToken);
+        }
+
+        var old = Map(entity);
+        await _reportRepository.DeleteAsync(entity, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        await _audit.WriteAsync(nameof(ReportDefinition), id, AuditActions.Delete, performedBy, old, cancellationToken: cancellationToken);
+    }
+
     private static ReportDto Map(ReportDefinition r) =>
         new(
             r.ReportId,
@@ -225,7 +246,12 @@ public sealed class ReportService : IReportService
             r.VersionNumber,
             r.Status,
             r.IsActive,
-            r.Parameters.Select(p => new ReportParameterDto(p.ParameterId, p.ReportId, p.ParameterName, p.ParameterType, p.ParameterValue, p.ValueSource)).ToList());
+            r.Parameters.Select(p => new ReportParameterDto(p.ParameterId, p.ReportId, p.ParameterName, p.ParameterType, p.ParameterValue, p.ValueSource)).ToList(),
+            r.Customer?.CustomerName,
+            r.DataSource?.DataSourceName,
+            r.Schedule?.ScheduleName,
+            r.FileConfiguration?.ConfigurationName,
+            r.DeliveryConfiguration?.DeliveryName);
 }
 
 internal static class ExecutionMappings

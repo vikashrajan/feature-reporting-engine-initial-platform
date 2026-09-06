@@ -3,19 +3,31 @@
 <h1>Schedules</h1>
 <div id="msg"></div>
 <div class="panel">
+  <h3 id="formTitle">Create / Edit Schedule</h3>
   <div class="grid-2">
+    <div><label>Schedule ID (auto for Edit)</label><input id="sId" readonly style="background:#f3f4f6;" /></div>
     <div><label>Name</label><input id="sName" /></div>
     <div><label>Type</label><select id="sType"><option>CRON</option><option>DAILY</option><option>WEEKLY</option><option>MONTHLY</option><option>ONCE</option></select></div>
-    <div><label>CronExpression</label><input id="sCron" value="0 * * * *" /></div>
-    <div><label>TimeZoneId</label><input id="sTz" value="UTC" /></div>
+    <div><label>Cron Expression</label><input id="sCron" value="0 * * * *" /></div>
+    <div><label>Time Zone</label><select id="sTz"><option value="UTC">UTC</option></select></div>
+    <div><label>Status</label><select id="sActive"><option value="true">Active</option><option value="false">Inactive</option></select></div>
   </div>
-  <button onclick="createSchedule()">Create</button>
+  <div style="margin-top:0.75rem;">
+    <button onclick="createSchedule()">Create Schedule</button>
+    <button class="secondary" onclick="updateSchedule()">Update Schedule</button>
+    <button class="secondary" onclick="resetForm()">Clear / New</button>
+  </div>
 </div>
-<div class="panel"><table><thead><tr><th>Id</th><th>Name</th><th>Type</th><th>Cron</th><th>TZ</th><th>Active</th></tr></thead><tbody id="rows"></tbody></table></div>
+<div class="panel"><table><thead><tr><th>Id</th><th>Name</th><th>Type</th><th>Cron</th><th>TZ</th><th>Active</th><th>Actions</th></tr></thead><tbody id="rows"></tbody></table></div>
 @section Scripts {
 <script>
-async function load(){ const items=await api.get('/api/schedules'); rows.innerHTML=items.map(x=>`<tr><td>${x.scheduleId}</td><td>${x.scheduleName}</td><td>${x.scheduleType}</td><td>${x.cronExpression||''}</td><td>${x.timeZoneId}</td><td>${x.isActive}</td></tr>`).join(''); }
-async function createSchedule(){ try{ await api.send('/api/schedules','POST',{scheduleName:sName.value,scheduleType:sType.value,cronExpression:sCron.value,timeZoneId:sTz.value,startDate:null,endDate:null}); showMsg(msg,'Created',true); await load(); } catch(e){ showMsg(msg,e.message,false);} }
+async function loadTimeZones(){ if(sTz.options.length>1) return; const zones=await api.get('/api/timezones'); sTz.innerHTML=zones.map(z=>`<option value="${z.id}">${z.displayName} (${z.id})</option>`).join(''); if([...sTz.options].some(o=>o.value==='India Standard Time')) sTz.value='India Standard Time'; else sTz.value='UTC'; }
+async function load(){ await loadTimeZones(); const items=await api.get('/api/schedules'); rows.innerHTML=items.map(x=>`<tr><td><strong>#${x.scheduleId}</strong></td><td><strong>${x.scheduleName}</strong></td><td>${x.scheduleType}</td><td><code>${x.cronExpression||''}</code></td><td>${x.timeZoneId}</td><td>${x.isActive ? 'Active' : 'Inactive'}</td><td><button class="secondary" onclick="editSchedule(${x.scheduleId})">Edit</button> <button class="danger" onclick="deleteSchedule(${x.scheduleId}, '${x.scheduleName.replace(/'/g, "\\'")}')">Delete</button></td></tr>`).join(''); }
+async function createSchedule(){ try{ await api.send('/api/schedules','POST',{scheduleName:sName.value,scheduleType:sType.value,cronExpression:sCron.value,timeZoneId:sTz.value,startDate:null,endDate:null}); showMsg(msg,'Created',true); resetForm(); await load(); } catch(e){ showMsg(msg,e.message,false);} }
+async function updateSchedule(){ try{ if(!sId.value) throw new Error('Select a schedule to edit first.'); await api.send('/api/schedules/'+sId.value,'PUT',{scheduleName:sName.value,scheduleType:sType.value,cronExpression:sCron.value,timeZoneId:sTz.value,startDate:null,endDate:null,isActive:sActive.value==='true'}); showMsg(msg,'Updated',true); resetForm(); await load(); } catch(e){ showMsg(msg,e.message,false);} }
+async function editSchedule(id){ await loadTimeZones(); const x=await api.get('/api/schedules/'+id); sId.value=x.scheduleId; sName.value=x.scheduleName; sType.value=x.scheduleType; sCron.value=x.cronExpression||''; sTz.value=x.timeZoneId||'UTC'; sActive.value=x.isActive?'true':'false'; formTitle.innerText='Edit Schedule #'+x.scheduleId; window.scrollTo({top:0,behavior:'smooth'}); }
+async function deleteSchedule(id,label){ if(!confirm(`Delete schedule "${label}"?`)) return; try{ await api.send('/api/schedules/'+id,'DELETE'); showMsg(msg,'Deleted',true); resetForm(); await load(); } catch(e){ showMsg(msg,e.message,false);} }
+function resetForm(){ sId.value=''; sName.value=''; sType.value='CRON'; sCron.value='0 * * * *'; sTz.value='UTC'; sActive.value='true'; formTitle.innerText='Create / Edit Schedule'; }
 load();
 </script>
 }

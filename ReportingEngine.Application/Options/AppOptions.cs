@@ -40,9 +40,15 @@ public sealed class EmailOptions
     public string FromDisplayName { get; set; } = "ReportingEngine";
     public string? UserName { get; set; }
     public string? Password { get; set; }
+    public int SmtpTimeoutSeconds { get; set; } = 120;
     /// <summary>When true, emails are written to disk instead of SMTP (local/dev).</summary>
     public bool UseFileDrop { get; set; } = true;
     public string FileDropPath { get; set; } = "./temp-emails";
+    public bool FailureNotificationEnabled { get; set; }
+    public string? FailureNotificationTo { get; set; }
+    public string? FailureNotificationCc { get; set; }
+    public string? FailureNotificationSubjectTemplate { get; set; } = "ReportingEngine job failed: {ReportCode}";
+    public string? FailureNotificationBodyTemplate { get; set; } = "<p>Report {ReportCode} failed.</p><p>Execution: {ExecutionId}</p><p>Error: {ErrorMessage}</p>";
 }
 
 public sealed class ConnectionReferencesOptions

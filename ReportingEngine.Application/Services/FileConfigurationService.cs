@@ -33,7 +33,7 @@ public sealed class FileConfigurationService : IFileConfigurationService
 
     public async Task<FileConfigurationDto> CreateAsync(CreateFileConfigurationRequest request, string performedBy, CancellationToken cancellationToken = default)
     {
-        Validate(request.FileFormat, request.SplitEnabled, request.SplitType, request.SplitValue);
+        Validate(request.FileFormat, request.SplitEnabled, request.SplitType, request.SplitValue, request.CompressionType, request.ZipBatchSize);
 
         var entity = new FileConfiguration
         {
@@ -44,6 +44,8 @@ public sealed class FileConfigurationService : IFileConfigurationService
             SplitType = request.SplitType,
             SplitValue = request.SplitValue,
             CompressionType = request.CompressionType,
+            ZipBatchSize = NormalizeZipBatchSize(request.ZipBatchSize),
+            KeepLocalFiles = request.KeepLocalFiles,
             EncryptionEnabled = request.EncryptionEnabled,
             CreatedBy = performedBy,
             CreatedDate = DateTime.UtcNow
@@ -57,7 +59,7 @@ public sealed class FileConfigurationService : IFileConfigurationService
 
     public async Task<FileConfigurationDto> UpdateAsync(long id, UpdateFileConfigurationRequest request, string performedBy, CancellationToken cancellationToken = default)
     {
-        Validate(request.FileFormat, request.SplitEnabled, request.SplitType, request.SplitValue);
+        Validate(request.FileFormat, request.SplitEnabled, request.SplitType, request.SplitValue, request.CompressionType, request.ZipBatchSize);
 
         var entity = await _repository.GetByIdAsync(id, cancellationToken)
             ?? throw new KeyNotFoundException($"File configuration {id} was not found.");
@@ -70,6 +72,8 @@ public sealed class FileConfigurationService : IFileConfigurationService
         entity.SplitType = request.SplitType;
         entity.SplitValue = request.SplitValue;
         entity.CompressionType = request.CompressionType;
+        entity.ZipBatchSize = NormalizeZipBatchSize(request.ZipBatchSize);
+        entity.KeepLocalFiles = request.KeepLocalFiles;
         entity.EncryptionEnabled = request.EncryptionEnabled;
         entity.ModifiedBy = performedBy;
         entity.ModifiedDate = DateTime.UtcNow;
@@ -80,7 +84,23 @@ public sealed class FileConfigurationService : IFileConfigurationService
         return Map(entity);
     }
 
-    internal static void Validate(string fileFormat, bool splitEnabled, string? splitType, long? splitValue)
+    public async Task DeleteAsync(long id, string performedBy, CancellationToken cancellationToken = default)
+    {
+        var entity = await _repository.GetByIdAsync(id, cancellationToken)
+            ?? throw new KeyNotFoundException($"File configuration {id} was not found.");
+
+        if (await _repository.IsReferencedAsync(id, cancellationToken))
+        {
+            throw new InvalidOperationException("Cannot delete this file configuration because it is used by one or more reports.");
+        }
+
+        var old = Map(entity);
+        await _repository.DeleteAsync(entity, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        await _audit.WriteAsync(nameof(FileConfiguration), id, AuditActions.Delete, performedBy, old, cancellationToken: cancellationToken);
+    }
+
+    internal static void Validate(string fileFormat, bool splitEnabled, string? splitType, long? splitValue, string? compressionType = null, int? zipBatchSize = null)
     {
         var format = fileFormat.Trim().ToUpperInvariant();
         var formats = new[] { FileFormats.Csv, FileFormats.Excel, FileFormats.Json, FileFormats.Xml, FileFormats.Txt };
@@ -102,8 +122,20 @@ public sealed class FileConfigurationService : IFileConfigurationService
                 throw new InvalidOperationException($"Unsupported split type '{splitType}'.");
             }
         }
+
+        if (zipBatchSize is <= 0)
+        {
+            throw new InvalidOperationException("ZipBatchSize must be positive when supplied.");
+        }
+
+        if (zipBatchSize is > 0 && !string.Equals(compressionType?.Trim(), CompressionTypes.Zip, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("ZipBatchSize can be used only when ZIP compression is enabled.");
+        }
     }
 
+    private static int? NormalizeZipBatchSize(int? zipBatchSize) => zipBatchSize is > 0 ? zipBatchSize : null;
+
     private static FileConfigurationDto Map(FileConfiguration f) =>
-        new(f.FileConfigId, f.ConfigurationName, f.FileFormat, f.FileNamePattern, f.SplitEnabled, f.SplitType, f.SplitValue, f.CompressionType, f.EncryptionEnabled);
+        new(f.FileConfigId, f.ConfigurationName, f.FileFormat, f.FileNamePattern, f.SplitEnabled, f.SplitType, f.SplitValue, f.CompressionType, f.ZipBatchSize, f.KeepLocalFiles, f.EncryptionEnabled);
 }

@@ -7,40 +7,50 @@ public interface ICustomerRepository
     Task<IReadOnlyList<Customer>> GetAllAsync(CancellationToken cancellationToken = default);
     Task<Customer?> GetByIdAsync(long id, CancellationToken cancellationToken = default);
     Task<Customer?> GetByCodeAsync(string code, CancellationToken cancellationToken = default);
+    Task<bool> IsReferencedAsync(long id, CancellationToken cancellationToken = default);
     Task<Customer> AddAsync(Customer entity, CancellationToken cancellationToken = default);
     Task UpdateAsync(Customer entity, CancellationToken cancellationToken = default);
+    Task DeleteAsync(Customer entity, CancellationToken cancellationToken = default);
 }
 
 public interface IDataSourceRepository
 {
     Task<IReadOnlyList<DataSource>> GetAllAsync(CancellationToken cancellationToken = default);
     Task<DataSource?> GetByIdAsync(long id, CancellationToken cancellationToken = default);
+    Task<bool> IsReferencedAsync(long id, CancellationToken cancellationToken = default);
     Task<DataSource> AddAsync(DataSource entity, CancellationToken cancellationToken = default);
     Task UpdateAsync(DataSource entity, CancellationToken cancellationToken = default);
+    Task DeleteAsync(DataSource entity, CancellationToken cancellationToken = default);
 }
 
 public interface IScheduleRepository
 {
     Task<IReadOnlyList<Schedule>> GetAllAsync(CancellationToken cancellationToken = default);
     Task<Schedule?> GetByIdAsync(long id, CancellationToken cancellationToken = default);
+    Task<bool> IsReferencedAsync(long id, CancellationToken cancellationToken = default);
     Task<Schedule> AddAsync(Schedule entity, CancellationToken cancellationToken = default);
     Task UpdateAsync(Schedule entity, CancellationToken cancellationToken = default);
+    Task DeleteAsync(Schedule entity, CancellationToken cancellationToken = default);
 }
 
 public interface IFileConfigurationRepository
 {
     Task<IReadOnlyList<FileConfiguration>> GetAllAsync(CancellationToken cancellationToken = default);
     Task<FileConfiguration?> GetByIdAsync(long id, CancellationToken cancellationToken = default);
+    Task<bool> IsReferencedAsync(long id, CancellationToken cancellationToken = default);
     Task<FileConfiguration> AddAsync(FileConfiguration entity, CancellationToken cancellationToken = default);
     Task UpdateAsync(FileConfiguration entity, CancellationToken cancellationToken = default);
+    Task DeleteAsync(FileConfiguration entity, CancellationToken cancellationToken = default);
 }
 
 public interface IDeliveryConfigurationRepository
 {
     Task<IReadOnlyList<DeliveryConfiguration>> GetAllAsync(CancellationToken cancellationToken = default);
     Task<DeliveryConfiguration?> GetByIdAsync(long id, CancellationToken cancellationToken = default);
+    Task<bool> IsReferencedAsync(long id, CancellationToken cancellationToken = default);
     Task<DeliveryConfiguration> AddAsync(DeliveryConfiguration entity, CancellationToken cancellationToken = default);
     Task UpdateAsync(DeliveryConfiguration entity, CancellationToken cancellationToken = default);
+    Task DeleteAsync(DeliveryConfiguration entity, CancellationToken cancellationToken = default);
 }
 
 public interface IReportRepository
@@ -50,8 +60,10 @@ public interface IReportRepository
     Task<ReportDefinition?> GetByIdWithDetailsAsync(long id, CancellationToken cancellationToken = default);
     Task<ReportDefinition?> GetByCodeAsync(string code, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<ReportDefinition>> GetActiveReportsAsync(CancellationToken cancellationToken = default);
+    Task<bool> HasExecutionsAsync(long id, CancellationToken cancellationToken = default);
     Task<ReportDefinition> AddAsync(ReportDefinition entity, CancellationToken cancellationToken = default);
     Task UpdateAsync(ReportDefinition entity, CancellationToken cancellationToken = default);
+    Task DeleteAsync(ReportDefinition entity, CancellationToken cancellationToken = default);
 }
 
 public interface IJobExecutionRepository
@@ -62,6 +74,7 @@ public interface IJobExecutionRepository
     Task<IReadOnlyList<JobExecution>> GetByReportIdAsync(long reportId, CancellationToken cancellationToken = default);
     Task<JobExecution?> GetLastSuccessfulAsync(long reportId, CancellationToken cancellationToken = default);
     Task<DashboardCounts> GetDashboardCountsAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<DashboardDetailRow>> GetDashboardDetailsAsync(string category, CancellationToken cancellationToken = default);
     Task<JobExecution> AddAsync(JobExecution entity, CancellationToken cancellationToken = default);
     Task UpdateAsync(JobExecution entity, CancellationToken cancellationToken = default);
 }
@@ -85,3 +98,16 @@ public interface IUnitOfWork
 }
 
 public sealed record DashboardCounts(int Running, int Successful, int Failed, int Upcoming);
+public sealed record DashboardDetailRow(
+    long? ExecutionId,
+    long ReportId,
+    string ReportCode,
+    string ReportName,
+    string? CustomerName,
+    string Status,
+    DateTime? ScheduledTime,
+    DateTime? StartedAt,
+    DateTime? CompletedAt,
+    long? RecordCount,
+    int? FileCount,
+    string? ErrorMessage);

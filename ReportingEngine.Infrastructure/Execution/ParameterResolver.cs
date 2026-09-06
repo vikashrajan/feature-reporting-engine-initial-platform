@@ -31,7 +31,10 @@ public sealed class ParameterResolver : IParameterResolver
             var value = parameter.ValueSource.ToUpperInvariant() switch
             {
                 ParameterValueSources.Static => ConvertValue(parameter.ParameterType, parameter.ParameterValue),
-                ParameterValueSources.System => ResolveSystem(parameter.ParameterName, currentExecutionUtc),
+                ParameterValueSources.System => ResolveSystem(
+                    string.IsNullOrWhiteSpace(parameter.ParameterValue) ? parameter.ParameterName : parameter.ParameterValue,
+                    currentExecutionUtc,
+                    report.Customer?.TimeZoneId),
                 ParameterValueSources.PreviousExecution => previous?.CompletedAt ?? previous?.StartedAt ?? DateTime.UnixEpoch,
                 ParameterValueSources.CurrentExecution => currentExecutionUtc,
                 _ => throw new InvalidOperationException($"Unsupported parameter value source '{parameter.ValueSource}'.")
@@ -57,15 +60,60 @@ public sealed class ParameterResolver : IParameterResolver
         return result;
     }
 
-    private static object? ResolveSystem(string name, DateTime currentExecutionUtc) =>
-        name.TrimStart('@').ToUpperInvariant() switch
+    private static object? ResolveSystem(string name, DateTime currentExecutionUtc, string? timeZoneId)
+    {
+        var timeZone = ResolveTimeZone(timeZoneId);
+        var currentLocal = TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(currentExecutionUtc, DateTimeKind.Utc), timeZone);
+        var todayStartLocal = currentLocal.Date;
+        var currentMonthStartLocal = new DateTime(currentLocal.Year, currentLocal.Month, 1);
+        var previousMonthStartLocal = currentMonthStartLocal.AddMonths(-1);
+
+        return name.TrimStart('@').ToUpperInvariant() switch
         {
             "UTCNOW" => currentExecutionUtc,
-            "TODAY" => currentExecutionUtc.Date,
+            "NOW" => currentExecutionUtc,
+            "CURRENT_EXECUTION" => currentExecutionUtc,
+            "TODAY" => ToUtc(todayStartLocal, timeZone),
+            "TODAY_START" => ToUtc(todayStartLocal, timeZone),
+            "TODAY_END" => ToUtc(todayStartLocal.AddDays(1), timeZone),
+            "YESTERDAY" => ToUtc(todayStartLocal.AddDays(-1), timeZone),
+            "YESTERDAY_START" => ToUtc(todayStartLocal.AddDays(-1), timeZone),
+            "YESTERDAY_END" => ToUtc(todayStartLocal, timeZone),
+            "LAST_7_DAYS_START" => ToUtc(todayStartLocal.AddDays(-7), timeZone),
+            "LAST_30_DAYS_START" => ToUtc(todayStartLocal.AddDays(-30), timeZone),
+            "CURRENT_MONTH_START" => ToUtc(currentMonthStartLocal, timeZone),
+            "MONTH_START" => ToUtc(currentMonthStartLocal, timeZone),
+            "CURRENT_MONTH_END" => ToUtc(currentMonthStartLocal.AddMonths(1), timeZone),
+            "NEXT_MONTH_START" => ToUtc(currentMonthStartLocal.AddMonths(1), timeZone),
+            "PREVIOUS_MONTH_START" => ToUtc(previousMonthStartLocal, timeZone),
+            "LAST_MONTH_START" => ToUtc(previousMonthStartLocal, timeZone),
+            "PREVIOUS_MONTH_END" => ToUtc(currentMonthStartLocal, timeZone),
+            "LAST_MONTH_END" => ToUtc(currentMonthStartLocal, timeZone),
             _ => currentExecutionUtc
         };
+    }
 
-    internal static object? ConvertValue(string parameterType, string? raw)
+    private static DateTime ToUtc(DateTime localDateTime, TimeZoneInfo timeZone) =>
+        TimeZoneInfo.ConvertTimeToUtc(DateTime.SpecifyKind(localDateTime, DateTimeKind.Unspecified), timeZone);
+
+    private static TimeZoneInfo ResolveTimeZone(string? timeZoneId)
+    {
+        if (string.IsNullOrWhiteSpace(timeZoneId) || string.Equals(timeZoneId, "UTC", StringComparison.OrdinalIgnoreCase))
+        {
+            return TimeZoneInfo.Utc;
+        }
+
+        try
+        {
+            return TimeZoneInfo.FindSystemTimeZoneById(timeZoneId);
+        }
+        catch
+        {
+            return TimeZoneInfo.Utc;
+        }
+    }
+
+    public static object? ConvertValue(string parameterType, string? raw)
     {
         if (raw is null)
         {

@@ -71,6 +71,8 @@ public sealed class FileConfigurationConfiguration : IEntityTypeConfiguration<Fi
         builder.Property(x => x.SplitEnabled).IsRequired().HasDefaultValue(false);
         builder.Property(x => x.SplitType).HasMaxLength(30);
         builder.Property(x => x.CompressionType).HasMaxLength(30);
+        builder.Property(x => x.ZipBatchSize);
+        builder.Property(x => x.KeepLocalFiles).IsRequired().HasDefaultValue(true);
         builder.Property(x => x.EncryptionEnabled).IsRequired().HasDefaultValue(false);
         builder.Property(x => x.CreatedBy).HasMaxLength(100).IsRequired();
         builder.Property(x => x.CreatedDate).IsRequired().HasDefaultValueSql("SYSUTCDATETIME()");

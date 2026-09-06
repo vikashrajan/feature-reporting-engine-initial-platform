@@ -72,4 +72,22 @@ public sealed class ExecutionService : IExecutionService
         var counts = await _executionRepository.GetDashboardCountsAsync(cancellationToken);
         return new DashboardDto(counts.Running, counts.Successful, counts.Failed, counts.Upcoming);
     }
+
+    public async Task<IReadOnlyList<DashboardDetailDto>> GetDashboardDetailsAsync(string category, CancellationToken cancellationToken = default)
+    {
+        var items = await _executionRepository.GetDashboardDetailsAsync(category, cancellationToken);
+        return items.Select(x => new DashboardDetailDto(
+            x.ExecutionId,
+            x.ReportId,
+            x.ReportCode,
+            x.ReportName,
+            x.CustomerName,
+            x.Status,
+            x.ScheduledTime,
+            x.StartedAt,
+            x.CompletedAt,
+            x.RecordCount,
+            x.FileCount,
+            x.ErrorMessage)).ToList();
+    }
 }
