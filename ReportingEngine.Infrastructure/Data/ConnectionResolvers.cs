@@ -20,7 +20,9 @@ public sealed class ConnectionStringResolver : IConnectionStringResolver
         }
 
         var envKey = $"ConnectionReferences__{connectionReference}";
-        var fromEnv = Environment.GetEnvironmentVariable(envKey);
+        var nestedEnvKey = $"ConnectionReferences__Values__{connectionReference}";
+        var fromEnv = Environment.GetEnvironmentVariable(envKey)
+            ?? Environment.GetEnvironmentVariable(nestedEnvKey);
         if (!string.IsNullOrWhiteSpace(fromEnv))
         {
             return fromEnv;
@@ -32,7 +34,7 @@ public sealed class ConnectionStringResolver : IConnectionStringResolver
         }
 
         throw new InvalidOperationException(
-            $"Connection reference '{connectionReference}' was not found. Configure ConnectionReferences:{connectionReference} or environment variable {envKey}.");
+            $"Connection reference '{connectionReference}' was not found. Configure ConnectionReferences:Values:{connectionReference} or environment variable {envKey} / {nestedEnvKey}.");
     }
 }
 

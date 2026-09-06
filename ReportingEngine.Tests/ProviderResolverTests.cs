@@ -112,6 +112,43 @@ public class ProviderResolverTests
     }
 
     [Fact]
+    public void ConnectionStringResolver_ShouldResolveConfiguredReference()
+    {
+        var options = Options.Create(new ConnectionReferencesOptions
+        {
+            Values =
+            {
+                ["DemoDB"] = "Server=(localdb)\\mssqllocaldb;Database=DemoDB;"
+            }
+        });
+        var resolver = new ConnectionStringResolver(options);
+
+        var connectionString = resolver.Resolve("DemoDB");
+
+        connectionString.Should().Contain("Database=DemoDB");
+    }
+
+    [Fact]
+    public void ConnectionStringResolver_ShouldResolveNestedEnvironmentReference()
+    {
+        const string envKey = "ConnectionReferences__Values__DemoDB_ENV_TEST";
+        Environment.SetEnvironmentVariable(envKey, "Server=env;Database=DemoDB;");
+
+        try
+        {
+            var resolver = new ConnectionStringResolver(Options.Create(new ConnectionReferencesOptions()));
+
+            var connectionString = resolver.Resolve("DemoDB_ENV_TEST");
+
+            connectionString.Should().Contain("Server=env");
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(envKey, null);
+        }
+    }
+
+    [Fact]
     public void EmailConnectionConfig_FromSecretReference_ShouldOverrideDefaultSmtpSettings()
     {
         var options = new EmailOptions

@@ -22,6 +22,7 @@ Log.Logger = new LoggerConfiguration()
     .CreateLogger();
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true);
 builder.Host.UseSerilog();
 
 builder.Services.AddInfrastructure(builder.Configuration, enableHangfireServer: false);

@@ -68,7 +68,7 @@ public sealed class EmailSettingsService : IEmailSettingsService
             ? "<p>Report {ReportCode} failed.</p><p>Execution: {ExecutionId}</p><p>Error: {ErrorMessage}</p>"
             : request.FailureNotificationBodyTemplate;
 
-        PersistToAppSettingsJson();
+        PersistToLocalAppSettingsJson();
 
         _logger.LogInformation("Updated email settings. Host: {Host}:{Port}, From: {FromAddress}, DropMode: {UseFileDrop}",
             _options.Host, _options.Port, _options.FromAddress, _options.UseFileDrop);
@@ -76,26 +76,17 @@ public sealed class EmailSettingsService : IEmailSettingsService
         return GetSettings();
     }
 
-    private void PersistToAppSettingsJson()
+    private void PersistToLocalAppSettingsJson()
     {
         try
         {
-            var candidatePaths = new[]
+            foreach (var filePath in GetLocalSettingsCandidatePaths())
             {
-                Path.Combine(AppContext.BaseDirectory, "appsettings.json"),
-                Path.Combine(AppContext.BaseDirectory, "appsettings.Development.json"),
-                Path.Combine(Directory.GetCurrentDirectory(), "ReportingEngine.Admin", "appsettings.json"),
-                Path.Combine(Directory.GetCurrentDirectory(), "ReportingEngine.Worker", "appsettings.json"),
-                Path.Combine(Directory.GetCurrentDirectory(), "appsettings.json")
-            };
+                Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
 
-            foreach (var filePath in candidatePaths.Distinct())
-            {
-                if (!File.Exists(filePath)) continue;
-
-                var json = File.ReadAllText(filePath);
-                var node = System.Text.Json.Nodes.JsonNode.Parse(json)?.AsObject();
-                if (node == null) continue;
+                var json = File.Exists(filePath) ? File.ReadAllText(filePath) : "{}";
+                var node = System.Text.Json.Nodes.JsonNode.Parse(json)?.AsObject()
+                    ?? new System.Text.Json.Nodes.JsonObject();
 
                 var emailObj = new System.Text.Json.Nodes.JsonObject
                 {
@@ -120,12 +111,51 @@ public sealed class EmailSettingsService : IEmailSettingsService
 
                 var options = new System.Text.Json.JsonSerializerOptions { WriteIndented = true };
                 File.WriteAllText(filePath, node.ToJsonString(options));
-                _logger.LogInformation("Persisted updated Email settings to {FilePath}", filePath);
+                _logger.LogInformation("Persisted updated Email settings to local override {FilePath}", filePath);
             }
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Could not persist Email settings to disk");
+            _logger.LogWarning(ex, "Could not persist Email settings to local override");
+        }
+    }
+
+    private static IReadOnlyList<string> GetLocalSettingsCandidatePaths()
+    {
+        var paths = new List<string>
+        {
+            Path.Combine(AppContext.BaseDirectory, "appsettings.Local.json"),
+            Path.Combine(Directory.GetCurrentDirectory(), "appsettings.Local.json")
+        };
+
+        foreach (var root in GetRepositoryRoots())
+        {
+            paths.Add(Path.Combine(root, "ReportingEngine.Admin", "appsettings.Local.json"));
+            paths.Add(Path.Combine(root, "ReportingEngine.Worker", "appsettings.Local.json"));
+        }
+
+        return paths
+            .Where(path => !string.IsNullOrWhiteSpace(path))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
+    private static IEnumerable<string> GetRepositoryRoots()
+    {
+        foreach (var start in new[] { Directory.GetCurrentDirectory(), AppContext.BaseDirectory })
+        {
+            var directory = new DirectoryInfo(start);
+            while (directory != null)
+            {
+                if (File.Exists(Path.Combine(directory.FullName, "ReportingEngine.slnx")) ||
+                    Directory.Exists(Path.Combine(directory.FullName, "ReportingEngine.Admin")))
+                {
+                    yield return directory.FullName;
+                    break;
+                }
+
+                directory = directory.Parent;
+            }
         }
     }
 

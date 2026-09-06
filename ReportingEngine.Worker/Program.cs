@@ -17,6 +17,7 @@ Log.Logger = new LoggerConfiguration()
     .CreateLogger();
 
 var builder = Host.CreateApplicationBuilder(args);
+builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true);
 builder.Logging.ClearProviders();
 builder.Services.AddSerilog();
 

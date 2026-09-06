@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Reporting Engine platform uses standard .NET configuration files (`appsettings.json`, environment variables, and User Secrets).
+The Reporting Engine platform uses standard .NET configuration files (`appsettings.json`, ignored `appsettings.Local.json` overrides, and environment variables).
 
 ---
 
@@ -68,6 +68,7 @@ The Reporting Engine platform uses standard .NET configuration files (`appsettin
 }
 ```
 - `UseFileDrop`: Set to `true` during local development/testing to write emails as files instead of sending via SMTP.
+- Save private SMTP credentials in `ReportingEngine.Admin/appsettings.Local.json` and `ReportingEngine.Worker/appsettings.Local.json`, or use the Delivery Configurations screen. These local files are intentionally ignored by Git.
 
 ### 6. Connection & Secret References (`ConnectionReferences`, `SecretReferences`)
 
@@ -75,12 +76,17 @@ Stores mapped connection strings or key references for data sources and delivery
 
 ```json
 "ConnectionReferences": {
-  "SqlConn": "Server=(localdb)\\mssqllocaldb;Database=ReportingEngineDb;Trusted_Connection=True;TrustServerCertificate=True;",
-  "CosmosConn": "AccountEndpoint=https://localhost:8081/;AccountKey=C2y6yDfjwjEG=;Database=Reporting;Container=Events"
+  "Values": {
+    "SqlConn": "Server=(localdb)\\mssqllocaldb;Database=ReportingEngineDb;Trusted_Connection=True;TrustServerCertificate=True;",
+    "CosmosConn": "AccountEndpoint=https://localhost:8081/;AccountKey=C2y6yDfjwjEG=;Database=Reporting;Container=Events",
+    "DemoDB": "Server=(localdb)\\mssqllocaldb;Database=DemoDB;Trusted_Connection=True;TrustServerCertificate=True;MultipleActiveResultSets=true"
+  }
 },
 "SecretReferences": {
-  "SftpPasswordKey": "sftp-pass-vault-key",
-  "BlobAccountKey": "azure-blob-key"
+  "Values": {
+    "SftpPasswordKey": "sftp-pass-vault-key",
+    "BlobAccountKey": "azure-blob-key"
+  }
 }
 ```
 
@@ -103,3 +109,4 @@ All configuration settings can be overridden via environment variables using dou
 - `Hangfire__WorkerCount`
 - `Email__UseFileDrop`
 - `Execution__TemporaryFilePath`
+- `ConnectionReferences__Values__DemoDB`

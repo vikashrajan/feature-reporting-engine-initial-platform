@@ -27,6 +27,8 @@ tmp/
 Thumbs.db
 
 ## Secrets / local overrides
+appsettings.Local.json
+appsettings.*.Local.json
 appsettings.*.local.json
 secrets.json
 *.pfx
