@@ -7,10 +7,10 @@ namespace ReportingEngine.Infrastructure.Data;
 
 public sealed class ConnectionStringResolver : IConnectionStringResolver
 {
-    private readonly ConnectionReferencesOptions _options;
+    private readonly IOptionsMonitor<ConnectionReferencesOptions> _options;
 
-    public ConnectionStringResolver(IOptions<ConnectionReferencesOptions> options) =>
-        _options = options.Value;
+    public ConnectionStringResolver(IOptionsMonitor<ConnectionReferencesOptions> options) =>
+        _options = options;
 
     public string Resolve(string connectionReference)
     {
@@ -28,7 +28,7 @@ public sealed class ConnectionStringResolver : IConnectionStringResolver
             return fromEnv;
         }
 
-        if (_options.Values.TryGetValue(connectionReference, out var value) && !string.IsNullOrWhiteSpace(value))
+        if (_options.CurrentValue.Values.TryGetValue(connectionReference, out var value) && !string.IsNullOrWhiteSpace(value))
         {
             return value;
         }

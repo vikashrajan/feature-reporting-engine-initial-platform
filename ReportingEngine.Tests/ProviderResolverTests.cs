@@ -114,14 +114,15 @@ public class ProviderResolverTests
     [Fact]
     public void ConnectionStringResolver_ShouldResolveConfiguredReference()
     {
-        var options = Options.Create(new ConnectionReferencesOptions
+        var options = new Mock<IOptionsMonitor<ConnectionReferencesOptions>>();
+        options.SetupGet(x => x.CurrentValue).Returns(new ConnectionReferencesOptions
         {
             Values =
             {
                 ["DemoDB"] = "Server=(localdb)\\mssqllocaldb;Database=DemoDB;"
             }
         });
-        var resolver = new ConnectionStringResolver(options);
+        var resolver = new ConnectionStringResolver(options.Object);
 
         var connectionString = resolver.Resolve("DemoDB");
 
@@ -136,7 +137,9 @@ public class ProviderResolverTests
 
         try
         {
-            var resolver = new ConnectionStringResolver(Options.Create(new ConnectionReferencesOptions()));
+            var options = new Mock<IOptionsMonitor<ConnectionReferencesOptions>>();
+            options.SetupGet(x => x.CurrentValue).Returns(new ConnectionReferencesOptions());
+            var resolver = new ConnectionStringResolver(options.Object);
 
             var connectionString = resolver.Resolve("DemoDB_ENV_TEST");
 
