@@ -1,6 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Data.SqlClient;
+using ReportingEngine.Application.Abstractions.Data;
 using ReportingEngine.Application.DTOs;
 using ReportingEngine.Application.Services;
+using ReportingEngine.Domain.Enums;
 
 namespace ReportingEngine.Admin.Controllers;
 
@@ -69,7 +72,13 @@ public sealed record TimeZoneDto(string Id, string DisplayName, string UtcOffset
 public sealed class DataSourcesController : ControllerBase
 {
     private readonly IDataSourceService _service;
-    public DataSourcesController(IDataSourceService service) => _service = service;
+    private readonly IConnectionStringResolver _connectionStringResolver;
+
+    public DataSourcesController(IDataSourceService service, IConnectionStringResolver connectionStringResolver)
+    {
+        _service = service;
+        _connectionStringResolver = connectionStringResolver;
+    }
 
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<DataSourceDto>>> GetAll(CancellationToken cancellationToken) =>
@@ -96,6 +105,41 @@ public sealed class DataSourcesController : ControllerBase
         await _service.DeleteAsync(id, User?.Identity?.Name ?? "admin", cancellationToken);
         return NoContent();
     }
+
+    [HttpPost("test-connection")]
+    public async Task<IActionResult> TestConnection([FromBody] TestDataSourceConnectionRequest request, CancellationToken cancellationToken)
+    {
+        if (!string.Equals(request.DataSourceType, DataSourceTypes.Sql, StringComparison.OrdinalIgnoreCase))
+        {
+            return BadRequest(new { success = false, message = "Connection test is currently available for SQL data sources." });
+        }
+
+        try
+        {
+            var connectionString = !string.IsNullOrWhiteSpace(request.ConnectionString)
+                ? NormalizeConnectionString(request.ConnectionString)
+                : _connectionStringResolver.Resolve(request.ConnectionReference);
+
+            await using var connection = new SqlConnection(connectionString);
+            await connection.OpenAsync(cancellationToken);
+
+            return Ok(new
+            {
+                success = true,
+                message = $"Connected successfully to SQL database '{connection.Database}' on '{connection.DataSource}'."
+            });
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return BadRequest(new { success = false, message = "Connection failed: " + ex.Message });
+        }
+    }
+
+    private static string NormalizeConnectionString(string connectionString) =>
+        connectionString.Trim()
+            .Replace("(localdb)\\\\", "(localdb)\\", StringComparison.OrdinalIgnoreCase)
+            .Replace("localhost\\\\", "localhost\\", StringComparison.OrdinalIgnoreCase)
+            .Replace(".\\\\", ".\\", StringComparison.OrdinalIgnoreCase);
 }
 
 [ApiController]

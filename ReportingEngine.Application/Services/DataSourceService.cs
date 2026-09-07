@@ -163,7 +163,7 @@ public sealed class DataSourceService : IDataSourceService
                     refs["Values"] = values;
                 }
 
-                values[connectionReference] = connectionString.Trim();
+                values[connectionReference] = NormalizeConnectionString(connectionString);
 
                 var options = new System.Text.Json.JsonSerializerOptions { WriteIndented = true };
                 File.WriteAllText(filePath, node.ToJsonString(options));
@@ -196,6 +196,12 @@ public sealed class DataSourceService : IDataSourceService
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
     }
+
+    private static string NormalizeConnectionString(string connectionString) =>
+        connectionString.Trim()
+            .Replace("(localdb)\\\\", "(localdb)\\", StringComparison.OrdinalIgnoreCase)
+            .Replace("localhost\\\\", "localhost\\", StringComparison.OrdinalIgnoreCase)
+            .Replace(".\\\\", ".\\", StringComparison.OrdinalIgnoreCase);
 
     private static IEnumerable<string> GetRepositoryRoots()
     {
