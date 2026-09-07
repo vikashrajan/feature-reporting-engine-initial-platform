@@ -12,6 +12,7 @@ public class DeliveryConfiguration
     public string? EmailSubjectTemplate { get; set; }
     public string? EmailBodyTemplate { get; set; }
     public string? SecretReference { get; set; }
+    public long? SmtpConfigId { get; set; }
     public bool IsFailureNotification { get; set; }
     public bool IsActive { get; set; } = true;
     public string CreatedBy { get; set; } = string.Empty;
@@ -20,4 +21,5 @@ public class DeliveryConfiguration
     public DateTime? ModifiedDate { get; set; }
 
     public ICollection<ReportDefinition> Reports { get; set; } = new List<ReportDefinition>();
+    public SmtpConfiguration? SmtpConfiguration { get; set; }
 }

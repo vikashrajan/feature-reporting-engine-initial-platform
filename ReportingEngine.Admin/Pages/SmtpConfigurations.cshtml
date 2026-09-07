@@ -1,0 +1,63 @@
+@page
+@model ReportingEngine.Admin.Pages.SmtpConfigurationsModel
+<h1>SMTP Profiles</h1>
+<div id="msg"></div>
+
+<div class="panel">
+  <h3 id="smtpFormTitle">Create / Edit SMTP Profile</h3>
+  <div class="grid-2">
+    <div><label>ID</label><input id="sId" readonly style="background:#f3f4f6;" /></div>
+    <div><label>Profile Name</label><input id="sName" /></div>
+    <div><label>Host</label><input id="sHost" placeholder="smtp.gmail.com" /></div>
+    <div><label>Port</label><input id="sPort" type="number" value="587" /></div>
+    <div><label>SSL / TLS</label><select id="sSsl"><option value="true">true</option><option value="false">false</option></select></div>
+    <div><label>Status</label><select id="sActive"><option value="true">Active</option><option value="false">Inactive</option></select></div>
+    <div><label>From Email</label><input id="sFrom" /></div>
+    <div><label>From Name</label><input id="sFromName" /></div>
+    <div><label>Username</label><input id="sUser" /></div>
+    <div><label>Password</label><input id="sPassword" type="password" placeholder="leave blank on edit to keep existing" /></div>
+    <div><label>Timeout Seconds</label><input id="sTimeout" type="number" value="120" /></div>
+    <div><label>Local File Drop Mode</label><select id="sDrop" onchange="toggleDrop()"><option value="false">false</option><option value="true">true</option></select></div>
+    <div id="dropPathGroup"><label>File Drop Path</label><input id="sDropPath" placeholder="./temp-emails" /></div>
+  </div>
+  <div style="margin-top:0.75rem;">
+    <button onclick="createSmtp()">Create</button>
+    <button class="secondary" onclick="updateSmtp()">Update</button>
+    <button class="secondary" onclick="resetSmtp()">Clear</button>
+  </div>
+</div>
+
+<div class="panel">
+  <h3>SMTP Profiles</h3>
+  <table>
+    <thead><tr><th>Id</th><th>Name</th><th>Host</th><th>From</th><th>Password</th><th>Status</th><th>Actions</th></tr></thead>
+    <tbody id="smtpRows"></tbody>
+  </table>
+</div>
+
+@section Scripts {
+<script>
+function escapeHtml(value) { return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function toggleDrop() { dropPathGroup.style.display = sDrop.value === 'true' ? 'block' : 'none'; }
+function body(includeActive) {
+  const x = { profileName: sName.value, host: sHost.value, port: Number(sPort.value || 587), enableSsl: sSsl.value === 'true', fromAddress: sFrom.value, fromDisplayName: sFromName.value || '', userName: sUser.value || null, password: sPassword.value || null, timeoutSeconds: Number(sTimeout.value || 120), useFileDrop: sDrop.value === 'true', fileDropPath: sDropPath.value || null };
+  if (includeActive) x.isActive = sActive.value === 'true';
+  return x;
+}
+async function loadSmtp() {
+  const items = await api.get('/api/smtpconfigurations');
+  smtpRows.innerHTML = items.map(x => `<tr><td><strong>${x.smtpConfigId}</strong></td><td><strong>${escapeHtml(x.profileName)}</strong></td><td>${x.useFileDrop ? 'File drop' : escapeHtml(x.host + ':' + x.port)}</td><td>${escapeHtml(x.fromAddress)}</td><td>${x.hasPassword ? 'Configured' : '-'}</td><td>${x.isActive ? '<span style="color:var(--ok)">Active</span>' : 'Inactive'}</td><td><button class="secondary" onclick="editSmtp(${x.smtpConfigId})">Edit</button> <button class="danger" onclick="deleteSmtp(${x.smtpConfigId}, '${escapeHtml(x.profileName).replace(/'/g, "\\'")}')">Delete</button></td></tr>`).join('');
+}
+async function createSmtp() { try { await api.send('/api/smtpconfigurations', 'POST', body(false)); showMsg(msg, 'SMTP profile created.', true); resetSmtp(); await loadSmtp(); } catch(e) { showMsg(msg, e.message, false); } }
+async function updateSmtp() { try { if (!sId.value) throw new Error('Please select an SMTP profile first.'); await api.send('/api/smtpconfigurations/' + sId.value, 'PUT', body(true)); showMsg(msg, 'SMTP profile updated.', true); resetSmtp(); await loadSmtp(); } catch(e) { showMsg(msg, e.message, false); } }
+async function editSmtp(id) {
+  const x = await api.get('/api/smtpconfigurations/' + id);
+  sId.value = x.smtpConfigId; sName.value = x.profileName || ''; sHost.value = x.host || ''; sPort.value = x.port || 587; sSsl.value = x.enableSsl ? 'true' : 'false'; sActive.value = x.isActive ? 'true' : 'false'; sFrom.value = x.fromAddress || ''; sFromName.value = x.fromDisplayName || ''; sUser.value = x.userName || ''; sPassword.value = ''; sTimeout.value = x.timeoutSeconds || 120; sDrop.value = x.useFileDrop ? 'true' : 'false'; sDropPath.value = x.fileDropPath || '';
+  toggleDrop(); smtpFormTitle.innerText = `Edit SMTP Profile #${x.smtpConfigId}`; window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+async function deleteSmtp(id, label) { if (!confirm(`Delete SMTP profile "${label}"?`)) return; try { await api.send('/api/smtpconfigurations/' + id, 'DELETE'); showMsg(msg, 'SMTP profile deleted.', true); resetSmtp(); await loadSmtp(); } catch(e) { showMsg(msg, e.message, false); } }
+function resetSmtp() { sId.value = ''; sName.value = ''; sHost.value = ''; sPort.value = '587'; sSsl.value = 'true'; sActive.value = 'true'; sFrom.value = ''; sFromName.value = ''; sUser.value = ''; sPassword.value = ''; sTimeout.value = '120'; sDrop.value = 'false'; sDropPath.value = ''; smtpFormTitle.innerText = 'Create / Edit SMTP Profile'; toggleDrop(); }
+toggleDrop();
+loadSmtp();
+</script>
+}

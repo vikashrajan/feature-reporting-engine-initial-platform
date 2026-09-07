@@ -1,0 +1,62 @@
+@page
+@model ReportingEngine.Admin.Pages.JobFailureProfilesModel
+<h1>Job Failure Email Profiles</h1>
+<div id="msg"></div>
+
+<div class="panel">
+  <h3 id="failureFormTitle">Create / Edit Failure Profile</h3>
+  <div class="grid-2">
+    <div><label>ID</label><input id="fId" readonly style="background:#f3f4f6;" /></div>
+    <div><label>Profile Name</label><input id="fName" /></div>
+    <div><label>SMTP Profile</label><select id="fSmtpConfigId"></select></div>
+    <div><label>Status</label><select id="fActive"><option value="true">Active</option><option value="false">Inactive</option></select></div>
+    <div><label>To Email(s)</label><input id="fTo" /></div>
+    <div><label>CC Email(s)</label><input id="fCc" /></div>
+    <div><label>BCC Email(s)</label><input id="fBcc" /></div>
+    <div><label>Subject Template</label><input id="fSubject" value="ReportingEngine job failed: {ReportCode}" /></div>
+    <div style="grid-column:1/-1"><label>Body Template (HTML)</label><input id="fBody" value="<p>Report {ReportCode} failed.</p><p>Execution: {ExecutionId}</p><p>Status: {Status}</p><p>Error: {ErrorMessage}</p>" /></div>
+  </div>
+  <div style="margin-top:0.75rem;">
+    <button onclick="createFailure()">Create</button>
+    <button class="secondary" onclick="updateFailure()">Update</button>
+    <button class="secondary" onclick="resetFailure()">Clear</button>
+  </div>
+</div>
+
+<div class="panel">
+  <h3>Failure Profiles</h3>
+  <table>
+    <thead><tr><th>Id</th><th>Name</th><th>SMTP</th><th>To</th><th>Status</th><th>Actions</th></tr></thead>
+    <tbody id="failureRows"></tbody>
+  </table>
+</div>
+
+@section Scripts {
+<script>
+function escapeHtml(value) { return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+async function loadSmtpOptions() {
+  const profiles = await api.get('/api/smtpconfigurations');
+  fSmtpConfigId.innerHTML = '<option value="">Select SMTP Profile</option>' + profiles.filter(x => x.isActive).map(x => `<option value="${x.smtpConfigId}">${escapeHtml(x.profileName)}</option>`).join('');
+}
+function body(includeActive) {
+  const x = { profileName: fName.value, smtpConfigId: Number(fSmtpConfigId.value || 0), emailTo: fTo.value, emailCc: fCc.value || null, emailBcc: fBcc.value || null, subjectTemplate: fSubject.value || null, bodyTemplate: fBody.value || null };
+  if (includeActive) x.isActive = fActive.value === 'true';
+  return x;
+}
+async function loadFailures() {
+  await loadSmtpOptions();
+  const items = await api.get('/api/jobfailureprofiles');
+  failureRows.innerHTML = items.map(x => `<tr><td><strong>${x.failureProfileId}</strong></td><td><strong>${escapeHtml(x.profileName)}</strong></td><td>${escapeHtml(x.smtpProfileName || '-')}</td><td>${escapeHtml(x.emailTo)}</td><td>${x.isActive ? '<span style="color:var(--ok)">Active</span>' : 'Inactive'}</td><td><button class="secondary" onclick="editFailure(${x.failureProfileId})">Edit</button> <button class="danger" onclick="deleteFailure(${x.failureProfileId}, '${escapeHtml(x.profileName).replace(/'/g, "\\'")}')">Delete</button></td></tr>`).join('');
+}
+async function createFailure() { try { await api.send('/api/jobfailureprofiles', 'POST', body(false)); showMsg(msg, 'Failure profile created.', true); resetFailure(); await loadFailures(); } catch(e) { showMsg(msg, e.message, false); } }
+async function updateFailure() { try { if (!fId.value) throw new Error('Please select a failure profile first.'); await api.send('/api/jobfailureprofiles/' + fId.value, 'PUT', body(true)); showMsg(msg, 'Failure profile updated.', true); resetFailure(); await loadFailures(); } catch(e) { showMsg(msg, e.message, false); } }
+async function editFailure(id) {
+  const x = await api.get('/api/jobfailureprofiles/' + id);
+  fId.value = x.failureProfileId; fName.value = x.profileName || ''; fSmtpConfigId.value = x.smtpConfigId || ''; fActive.value = x.isActive ? 'true' : 'false'; fTo.value = x.emailTo || ''; fCc.value = x.emailCc || ''; fBcc.value = x.emailBcc || ''; fSubject.value = x.subjectTemplate || 'ReportingEngine job failed: {ReportCode}'; fBody.value = x.bodyTemplate || '<p>Report {ReportCode} failed.</p><p>Execution: {ExecutionId}</p><p>Status: {Status}</p><p>Error: {ErrorMessage}</p>';
+  failureFormTitle.innerText = `Edit Failure Profile #${x.failureProfileId}`; window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+async function deleteFailure(id, label) { if (!confirm(`Delete failure profile "${label}"?`)) return; try { await api.send('/api/jobfailureprofiles/' + id, 'DELETE'); showMsg(msg, 'Failure profile deleted.', true); resetFailure(); await loadFailures(); } catch(e) { showMsg(msg, e.message, false); } }
+function resetFailure() { fId.value = ''; fName.value = ''; fSmtpConfigId.value = ''; fActive.value = 'true'; fTo.value = ''; fCc.value = ''; fBcc.value = ''; fSubject.value = 'ReportingEngine job failed: {ReportCode}'; fBody.value = '<p>Report {ReportCode} failed.</p><p>Execution: {ExecutionId}</p><p>Status: {Status}</p><p>Error: {ErrorMessage}</p>'; failureFormTitle.innerText = 'Create / Edit Failure Profile'; }
+loadFailures();
+</script>
+}

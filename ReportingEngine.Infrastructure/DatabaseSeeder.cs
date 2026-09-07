@@ -61,6 +61,22 @@ public static class DatabaseSeeder
             CreatedDate = DateTime.UtcNow
         };
 
+        var smtp = new SmtpConfiguration
+        {
+            ProfileName = "Demo File Drop SMTP",
+            Host = "filedrop",
+            Port = 25,
+            EnableSsl = false,
+            FromAddress = "noreply@reportingengine.local",
+            FromDisplayName = "ReportingEngine",
+            TimeoutSeconds = 120,
+            UseFileDrop = true,
+            FileDropPath = "./temp-emails",
+            IsActive = true,
+            CreatedBy = "seed",
+            CreatedDate = DateTime.UtcNow
+        };
+
         var delivery = new DeliveryConfiguration
         {
             DeliveryName = "Demo Email",
@@ -68,7 +84,7 @@ public static class DatabaseSeeder
             EmailTo = "reports@example.com",
             EmailSubjectTemplate = "Report {ReportCode} - {ExecutionDate}",
             EmailBodyTemplate = "<p>Customer {CustomerCode}: {RecordCount} records in {FileCount} file(s).</p>",
-            SecretReference = """{"Host":"filedrop","Port":25,"UseFileDrop":true,"FileDropPath":"./temp-emails"}""",
+            SmtpConfiguration = smtp,
             IsActive = true,
             CreatedBy = "seed",
             CreatedDate = DateTime.UtcNow
@@ -89,6 +105,7 @@ public static class DatabaseSeeder
         db.DataSources.Add(dataSource);
         db.Schedules.Add(schedule);
         db.FileConfigurations.Add(fileConfig);
+        db.SmtpConfigurations.Add(smtp);
         db.DeliveryConfigurations.Add(delivery);
         db.DeliveryConfigurations.Add(sftpDelivery);
         await db.SaveChangesAsync(cancellationToken);

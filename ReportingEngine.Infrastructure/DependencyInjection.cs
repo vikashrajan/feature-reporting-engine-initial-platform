@@ -52,6 +52,8 @@ public static class DependencyInjection
         services.AddScoped<IScheduleRepository, ScheduleRepository>();
         services.AddScoped<IFileConfigurationRepository, FileConfigurationRepository>();
         services.AddScoped<IDeliveryConfigurationRepository, DeliveryConfigurationRepository>();
+        services.AddScoped<ISmtpConfigurationRepository, SmtpConfigurationRepository>();
+        services.AddScoped<IJobFailureNotificationProfileRepository, JobFailureNotificationProfileRepository>();
         services.AddScoped<IReportRepository, ReportRepository>();
         services.AddScoped<IJobExecutionRepository, JobExecutionRepository>();
         services.AddScoped<IFileExecutionRepository, FileExecutionRepository>();
@@ -199,6 +201,64 @@ public static class DependencyInjection
                 IF COL_LENGTH('RepScdhedularProject_DeliveryConfiguration', 'IsFailureNotification') IS NULL
                 BEGIN
                     ALTER TABLE RepScdhedularProject_DeliveryConfiguration ADD IsFailureNotification bit NOT NULL CONSTRAINT DF_RepScdhedularProject_DeliveryConfiguration_IsFailureNotification DEFAULT(0)
+                END
+
+                IF OBJECT_ID('RepScdhedularProject_SmtpConfiguration', 'U') IS NULL
+                BEGIN
+                    CREATE TABLE RepScdhedularProject_SmtpConfiguration (
+                        SmtpConfigId bigint IDENTITY(1,1) NOT NULL CONSTRAINT PK_RepScdhedularProject_SmtpConfiguration PRIMARY KEY,
+                        ProfileName nvarchar(200) NOT NULL,
+                        Host nvarchar(300) NOT NULL,
+                        Port int NOT NULL CONSTRAINT DF_RepScdhedularProject_SmtpConfiguration_Port DEFAULT(587),
+                        EnableSsl bit NOT NULL CONSTRAINT DF_RepScdhedularProject_SmtpConfiguration_EnableSsl DEFAULT(1),
+                        FromAddress nvarchar(320) NOT NULL,
+                        FromDisplayName nvarchar(200) NOT NULL CONSTRAINT DF_RepScdhedularProject_SmtpConfiguration_FromDisplayName DEFAULT(''),
+                        UserName nvarchar(320) NULL,
+                        Password nvarchar(max) NULL,
+                        TimeoutSeconds int NOT NULL CONSTRAINT DF_RepScdhedularProject_SmtpConfiguration_TimeoutSeconds DEFAULT(120),
+                        UseFileDrop bit NOT NULL CONSTRAINT DF_RepScdhedularProject_SmtpConfiguration_UseFileDrop DEFAULT(0),
+                        FileDropPath nvarchar(1000) NULL,
+                        IsActive bit NOT NULL CONSTRAINT DF_RepScdhedularProject_SmtpConfiguration_IsActive DEFAULT(1),
+                        CreatedBy nvarchar(100) NOT NULL,
+                        CreatedDate datetime2 NOT NULL CONSTRAINT DF_RepScdhedularProject_SmtpConfiguration_CreatedDate DEFAULT(SYSUTCDATETIME()),
+                        ModifiedBy nvarchar(100) NULL,
+                        ModifiedDate datetime2 NULL
+                    )
+                    CREATE UNIQUE INDEX IX_RepScdhedularProject_SmtpConfiguration_ProfileName ON RepScdhedularProject_SmtpConfiguration(ProfileName)
+                END
+
+                IF COL_LENGTH('RepScdhedularProject_DeliveryConfiguration', 'SmtpConfigId') IS NULL
+                BEGIN
+                    ALTER TABLE RepScdhedularProject_DeliveryConfiguration ADD SmtpConfigId bigint NULL
+                END
+
+                IF OBJECT_ID('FK_RepScdhedularProject_DeliveryConfiguration_SmtpConfiguration_SmtpConfigId', 'F') IS NULL
+                BEGIN
+                    ALTER TABLE RepScdhedularProject_DeliveryConfiguration
+                    ADD CONSTRAINT FK_RepScdhedularProject_DeliveryConfiguration_SmtpConfiguration_SmtpConfigId
+                    FOREIGN KEY (SmtpConfigId) REFERENCES RepScdhedularProject_SmtpConfiguration(SmtpConfigId)
+                END
+
+                IF OBJECT_ID('RepScdhedularProject_JobFailureNotificationProfile', 'U') IS NULL
+                BEGIN
+                    CREATE TABLE RepScdhedularProject_JobFailureNotificationProfile (
+                        FailureProfileId bigint IDENTITY(1,1) NOT NULL CONSTRAINT PK_RepScdhedularProject_JobFailureNotificationProfile PRIMARY KEY,
+                        ProfileName nvarchar(200) NOT NULL,
+                        SmtpConfigId bigint NOT NULL,
+                        EmailTo nvarchar(2000) NOT NULL,
+                        EmailCc nvarchar(2000) NULL,
+                        EmailBcc nvarchar(2000) NULL,
+                        SubjectTemplate nvarchar(1000) NULL,
+                        BodyTemplate nvarchar(max) NULL,
+                        IsActive bit NOT NULL CONSTRAINT DF_RepScdhedularProject_JobFailureNotificationProfile_IsActive DEFAULT(1),
+                        CreatedBy nvarchar(100) NOT NULL,
+                        CreatedDate datetime2 NOT NULL CONSTRAINT DF_RepScdhedularProject_JobFailureNotificationProfile_CreatedDate DEFAULT(SYSUTCDATETIME()),
+                        ModifiedBy nvarchar(100) NULL,
+                        ModifiedDate datetime2 NULL,
+                        CONSTRAINT FK_RepScdhedularProject_JobFailureNotificationProfile_SmtpConfiguration_SmtpConfigId
+                            FOREIGN KEY (SmtpConfigId) REFERENCES RepScdhedularProject_SmtpConfiguration(SmtpConfigId)
+                    )
+                    CREATE UNIQUE INDEX IX_RepScdhedularProject_JobFailureNotificationProfile_ProfileName ON RepScdhedularProject_JobFailureNotificationProfile(ProfileName)
                 END
                 """, cancellationToken);
         }

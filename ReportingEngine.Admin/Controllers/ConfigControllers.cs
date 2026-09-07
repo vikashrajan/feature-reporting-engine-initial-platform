@@ -273,3 +273,71 @@ public sealed class DeliveryConfigurationsController : ControllerBase
         }
     }
 }
+
+[ApiController]
+[Route("api/smtpconfigurations")]
+public sealed class SmtpConfigurationsController : ControllerBase
+{
+    private readonly ISmtpConfigurationService _service;
+    public SmtpConfigurationsController(ISmtpConfigurationService service) => _service = service;
+
+    [HttpGet]
+    public async Task<ActionResult<IReadOnlyList<SmtpConfigurationDto>>> GetAll(CancellationToken cancellationToken) =>
+        Ok(await _service.GetAllAsync(cancellationToken));
+
+    [HttpGet("{id:long}")]
+    public async Task<ActionResult<SmtpConfigurationDto>> GetById(long id, CancellationToken cancellationToken)
+    {
+        var item = await _service.GetByIdAsync(id, cancellationToken);
+        return item is null ? NotFound() : Ok(item);
+    }
+
+    [HttpPost]
+    public async Task<ActionResult<SmtpConfigurationDto>> Create([FromBody] CreateSmtpConfigurationRequest request, CancellationToken cancellationToken) =>
+        Ok(await _service.CreateAsync(request, User?.Identity?.Name ?? "admin", cancellationToken));
+
+    [HttpPut("{id:long}")]
+    public async Task<ActionResult<SmtpConfigurationDto>> Update(long id, [FromBody] UpdateSmtpConfigurationRequest request, CancellationToken cancellationToken) =>
+        Ok(await _service.UpdateAsync(id, request, User?.Identity?.Name ?? "admin", cancellationToken));
+
+    [HttpDelete("{id:long}")]
+    public async Task<IActionResult> Delete(long id, CancellationToken cancellationToken)
+    {
+        await _service.DeleteAsync(id, User?.Identity?.Name ?? "admin", cancellationToken);
+        return NoContent();
+    }
+}
+
+[ApiController]
+[Route("api/jobfailureprofiles")]
+public sealed class JobFailureProfilesController : ControllerBase
+{
+    private readonly IJobFailureNotificationProfileService _service;
+    public JobFailureProfilesController(IJobFailureNotificationProfileService service) => _service = service;
+
+    [HttpGet]
+    public async Task<ActionResult<IReadOnlyList<JobFailureNotificationProfileDto>>> GetAll(CancellationToken cancellationToken) =>
+        Ok(await _service.GetAllAsync(cancellationToken));
+
+    [HttpGet("{id:long}")]
+    public async Task<ActionResult<JobFailureNotificationProfileDto>> GetById(long id, CancellationToken cancellationToken)
+    {
+        var item = await _service.GetByIdAsync(id, cancellationToken);
+        return item is null ? NotFound() : Ok(item);
+    }
+
+    [HttpPost]
+    public async Task<ActionResult<JobFailureNotificationProfileDto>> Create([FromBody] CreateJobFailureNotificationProfileRequest request, CancellationToken cancellationToken) =>
+        Ok(await _service.CreateAsync(request, User?.Identity?.Name ?? "admin", cancellationToken));
+
+    [HttpPut("{id:long}")]
+    public async Task<ActionResult<JobFailureNotificationProfileDto>> Update(long id, [FromBody] UpdateJobFailureNotificationProfileRequest request, CancellationToken cancellationToken) =>
+        Ok(await _service.UpdateAsync(id, request, User?.Identity?.Name ?? "admin", cancellationToken));
+
+    [HttpDelete("{id:long}")]
+    public async Task<IActionResult> Delete(long id, CancellationToken cancellationToken)
+    {
+        await _service.DeleteAsync(id, User?.Identity?.Name ?? "admin", cancellationToken);
+        return NoContent();
+    }
+}

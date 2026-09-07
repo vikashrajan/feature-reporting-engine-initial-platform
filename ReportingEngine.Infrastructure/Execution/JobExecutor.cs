@@ -16,7 +16,7 @@ public sealed class JobExecutor : IJobExecutor
     private readonly IReportRepository _reportRepository;
     private readonly IJobExecutionRepository _executionRepository;
     private readonly IFileExecutionRepository _fileExecutionRepository;
-    private readonly IDeliveryConfigurationRepository _deliveryConfigurationRepository;
+    private readonly IJobFailureNotificationProfileRepository _failureNotificationProfileRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IParameterResolver _parameterResolver;
     private readonly IDataSourceProviderResolver _dataSourceProviderResolver;
@@ -33,7 +33,7 @@ public sealed class JobExecutor : IJobExecutor
         IReportRepository reportRepository,
         IJobExecutionRepository executionRepository,
         IFileExecutionRepository fileExecutionRepository,
-        IDeliveryConfigurationRepository deliveryConfigurationRepository,
+        IJobFailureNotificationProfileRepository failureNotificationProfileRepository,
         IUnitOfWork unitOfWork,
         IParameterResolver parameterResolver,
         IDataSourceProviderResolver dataSourceProviderResolver,
@@ -49,7 +49,7 @@ public sealed class JobExecutor : IJobExecutor
         _reportRepository = reportRepository;
         _executionRepository = executionRepository;
         _fileExecutionRepository = fileExecutionRepository;
-        _deliveryConfigurationRepository = deliveryConfigurationRepository;
+        _failureNotificationProfileRepository = failureNotificationProfileRepository;
         _unitOfWork = unitOfWork;
         _parameterResolver = parameterResolver;
         _dataSourceProviderResolver = dataSourceProviderResolver;
@@ -105,6 +105,7 @@ public sealed class JobExecutor : IJobExecutor
         {
             var report = await _reportRepository.GetByIdWithDetailsAsync(execution.ReportId, cancellationToken)
                 ?? throw new InvalidOperationException($"Report {execution.ReportId} was not found.");
+            _logger.LogInformation("Execution pipeline started for ReportCode={ReportCode}", report.ReportCode);
 
             if (execution.Status == JobExecutionStatuses.Cancelled)
             {
@@ -133,6 +134,7 @@ public sealed class JobExecutor : IJobExecutor
             var parameters = await _parameterResolver.ResolveAsync(report.ReportId, currentExecutionUtc, cancellationToken);
 
             var dataProvider = _dataSourceProviderResolver.Resolve(report.DataSource.DataSourceType);
+            _logger.LogInformation("Executing data source DataSourceId={DataSourceId} Type={DataSourceType}", report.DataSourceId, report.DataSource.DataSourceType);
             var rows = await dataProvider.ExecuteQueryAsync(
                 string.IsNullOrWhiteSpace(report.DataSource.ConnectionString)
                     ? report.DataSource.ConnectionReference
@@ -312,6 +314,12 @@ public sealed class JobExecutor : IJobExecutor
         }
 
         var deliveryProvider = _deliveryProviderResolver.Resolve(report.DeliveryConfiguration.DeliveryType);
+        _logger.LogInformation(
+            "Delivering ReportCode={ReportCode} using DeliveryConfigId={DeliveryConfigId} Type={DeliveryType} AttachmentCount={AttachmentCount}",
+            report.ReportCode,
+            report.DeliveryConfigId,
+            report.DeliveryConfiguration.DeliveryType,
+            attachmentPaths.Count);
         await deliveryProvider.DeliverAsync(new DeliveryRequest
         {
             DeliveryType = report.DeliveryConfiguration.DeliveryType,
@@ -322,6 +330,7 @@ public sealed class JobExecutor : IJobExecutor
             EmailBcc = report.DeliveryConfiguration.EmailBcc,
             EmailSubjectTemplate = report.DeliveryConfiguration.EmailSubjectTemplate,
             EmailBodyTemplate = report.DeliveryConfiguration.EmailBodyTemplate,
+            SmtpConnection = BuildSmtpConnection(report.DeliveryConfiguration),
             AttachmentPaths = attachmentPaths,
             Tokens = new DeliveryTokenContext(
                 report.Customer.CustomerCode,
@@ -334,11 +343,11 @@ public sealed class JobExecutor : IJobExecutor
 
     private async Task SendFailureNotificationAsync(JobExecution execution, Exception error, CancellationToken cancellationToken)
     {
-        var profiles = await _deliveryConfigurationRepository.GetFailureNotificationProfilesAsync(cancellationToken)
-            ?? Array.Empty<DeliveryConfiguration>();
+        var profiles = await _failureNotificationProfileRepository.GetActiveAsync(cancellationToken)
+            ?? Array.Empty<JobFailureNotificationProfile>();
         if (profiles.Count == 0)
         {
-            _logger.LogWarning("No active failure notification EMAIL delivery configurations were found for execution {ExecutionId}", execution.ExecutionId);
+            _logger.LogWarning("No active job failure notification profiles were found for execution {ExecutionId}", execution.ExecutionId);
             return;
         }
 
@@ -357,15 +366,16 @@ public sealed class JobExecutor : IJobExecutor
             var deliveryProvider = _deliveryProviderResolver.Resolve(DeliveryTypes.Email);
             foreach (var profile in profiles)
             {
+                _logger.LogInformation("Sending failure notification for ExecutionId={ExecutionId} using FailureProfileId={FailureProfileId} SmtpConfigId={SmtpConfigId}", execution.ExecutionId, profile.FailureProfileId, profile.SmtpConfigId);
                 await deliveryProvider.DeliverAsync(new DeliveryRequest
                 {
                     DeliveryType = DeliveryTypes.Email,
-                    SecretReference = profile.SecretReference,
                     EmailTo = profile.EmailTo,
                     EmailCc = profile.EmailCc,
                     EmailBcc = profile.EmailBcc,
-                    EmailSubjectTemplate = profile.EmailSubjectTemplate ?? "ReportingEngine job failed: {ReportCode}",
-                    EmailBodyTemplate = profile.EmailBodyTemplate ?? "<p>Report {ReportCode} failed.</p><p>Execution: {ExecutionId}</p><p>Status: {Status}</p><p>Error: {ErrorMessage}</p>",
+                    EmailSubjectTemplate = profile.SubjectTemplate ?? "ReportingEngine job failed: {ReportCode}",
+                    EmailBodyTemplate = profile.BodyTemplate ?? "<p>Report {ReportCode} failed.</p><p>Execution: {ExecutionId}</p><p>Status: {Status}</p><p>Error: {ErrorMessage}</p>",
+                    SmtpConnection = BuildSmtpConnection(profile.SmtpConfiguration),
                     AttachmentPaths = Array.Empty<string>(),
                     Tokens = new DeliveryTokenContext(
                         report?.Customer?.CustomerCode ?? string.Empty,
@@ -384,6 +394,35 @@ public sealed class JobExecutor : IJobExecutor
             _logger.LogWarning(notificationError, "Could not send failure notification email for execution {ExecutionId}", execution.ExecutionId);
         }
     }
+
+    private static SmtpConnectionSettings? BuildSmtpConnection(DeliveryConfiguration deliveryConfiguration)
+    {
+        if (!deliveryConfiguration.DeliveryType.Equals(DeliveryTypes.Email, StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        if (deliveryConfiguration.SmtpConfiguration is null)
+        {
+            throw new InvalidOperationException($"EMAIL delivery configuration '{deliveryConfiguration.DeliveryName}' does not have a valid SMTP profile configured.");
+        }
+
+        return BuildSmtpConnection(deliveryConfiguration.SmtpConfiguration);
+    }
+
+    private static SmtpConnectionSettings BuildSmtpConnection(SmtpConfiguration smtp) =>
+        new(
+            smtp.ProfileName,
+            smtp.Host,
+            smtp.Port,
+            smtp.EnableSsl,
+            smtp.FromAddress,
+            smtp.FromDisplayName,
+            smtp.UserName,
+            smtp.Password,
+            smtp.TimeoutSeconds,
+            smtp.UseFileDrop,
+            smtp.FileDropPath);
 
     private async Task MarkFilesDeliveredAsync(long executionId, HashSet<int> sequenceNumbers, CancellationToken cancellationToken)
     {

@@ -47,6 +47,24 @@ public interface IDeliveryConfigurationService
     Task DeleteAsync(long id, string performedBy, CancellationToken cancellationToken = default);
 }
 
+public interface ISmtpConfigurationService
+{
+    Task<IReadOnlyList<SmtpConfigurationDto>> GetAllAsync(CancellationToken cancellationToken = default);
+    Task<SmtpConfigurationDto?> GetByIdAsync(long id, CancellationToken cancellationToken = default);
+    Task<SmtpConfigurationDto> CreateAsync(CreateSmtpConfigurationRequest request, string performedBy, CancellationToken cancellationToken = default);
+    Task<SmtpConfigurationDto> UpdateAsync(long id, UpdateSmtpConfigurationRequest request, string performedBy, CancellationToken cancellationToken = default);
+    Task DeleteAsync(long id, string performedBy, CancellationToken cancellationToken = default);
+}
+
+public interface IJobFailureNotificationProfileService
+{
+    Task<IReadOnlyList<JobFailureNotificationProfileDto>> GetAllAsync(CancellationToken cancellationToken = default);
+    Task<JobFailureNotificationProfileDto?> GetByIdAsync(long id, CancellationToken cancellationToken = default);
+    Task<JobFailureNotificationProfileDto> CreateAsync(CreateJobFailureNotificationProfileRequest request, string performedBy, CancellationToken cancellationToken = default);
+    Task<JobFailureNotificationProfileDto> UpdateAsync(long id, UpdateJobFailureNotificationProfileRequest request, string performedBy, CancellationToken cancellationToken = default);
+    Task DeleteAsync(long id, string performedBy, CancellationToken cancellationToken = default);
+}
+
 public interface IReportService
 {
     Task<IReadOnlyList<ReportDto>> GetAllAsync(CancellationToken cancellationToken = default);

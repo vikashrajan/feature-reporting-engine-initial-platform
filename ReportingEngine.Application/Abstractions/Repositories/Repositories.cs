@@ -47,11 +47,30 @@ public interface IDeliveryConfigurationRepository
 {
     Task<IReadOnlyList<DeliveryConfiguration>> GetAllAsync(CancellationToken cancellationToken = default);
     Task<DeliveryConfiguration?> GetByIdAsync(long id, CancellationToken cancellationToken = default);
-    Task<IReadOnlyList<DeliveryConfiguration>> GetFailureNotificationProfilesAsync(CancellationToken cancellationToken = default);
     Task<bool> IsReferencedAsync(long id, CancellationToken cancellationToken = default);
     Task<DeliveryConfiguration> AddAsync(DeliveryConfiguration entity, CancellationToken cancellationToken = default);
     Task UpdateAsync(DeliveryConfiguration entity, CancellationToken cancellationToken = default);
     Task DeleteAsync(DeliveryConfiguration entity, CancellationToken cancellationToken = default);
+}
+
+public interface ISmtpConfigurationRepository
+{
+    Task<IReadOnlyList<SmtpConfiguration>> GetAllAsync(CancellationToken cancellationToken = default);
+    Task<SmtpConfiguration?> GetByIdAsync(long id, CancellationToken cancellationToken = default);
+    Task<bool> IsReferencedAsync(long id, CancellationToken cancellationToken = default);
+    Task<SmtpConfiguration> AddAsync(SmtpConfiguration entity, CancellationToken cancellationToken = default);
+    Task UpdateAsync(SmtpConfiguration entity, CancellationToken cancellationToken = default);
+    Task DeleteAsync(SmtpConfiguration entity, CancellationToken cancellationToken = default);
+}
+
+public interface IJobFailureNotificationProfileRepository
+{
+    Task<IReadOnlyList<JobFailureNotificationProfile>> GetAllAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<JobFailureNotificationProfile>> GetActiveAsync(CancellationToken cancellationToken = default);
+    Task<JobFailureNotificationProfile?> GetByIdAsync(long id, CancellationToken cancellationToken = default);
+    Task<JobFailureNotificationProfile> AddAsync(JobFailureNotificationProfile entity, CancellationToken cancellationToken = default);
+    Task UpdateAsync(JobFailureNotificationProfile entity, CancellationToken cancellationToken = default);
+    Task DeleteAsync(JobFailureNotificationProfile entity, CancellationToken cancellationToken = default);
 }
 
 public interface IReportRepository

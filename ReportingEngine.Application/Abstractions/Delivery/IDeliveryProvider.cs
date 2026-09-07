@@ -22,9 +22,23 @@ public sealed class DeliveryRequest
     public string? EmailBcc { get; init; }
     public string? EmailSubjectTemplate { get; init; }
     public string? EmailBodyTemplate { get; init; }
+    public SmtpConnectionSettings? SmtpConnection { get; init; }
     public required IReadOnlyList<string> AttachmentPaths { get; init; }
     public required DeliveryTokenContext Tokens { get; init; }
 }
+
+public sealed record SmtpConnectionSettings(
+    string ProfileName,
+    string Host,
+    int Port,
+    bool EnableSsl,
+    string FromAddress,
+    string FromDisplayName,
+    string? UserName,
+    string? Password,
+    int TimeoutSeconds,
+    bool UseFileDrop,
+    string? FileDropPath);
 
 public sealed record DeliveryTokenContext(
     string CustomerCode,

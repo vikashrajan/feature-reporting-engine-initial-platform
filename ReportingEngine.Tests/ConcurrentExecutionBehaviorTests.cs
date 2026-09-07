@@ -97,7 +97,7 @@ public class ConcurrentExecutionBehaviorTests : IDisposable
             reportRepoMock.Object,
             executionRepoMock.Object,
             fileRepoMock.Object,
-            Mock.Of<IDeliveryConfigurationRepository>(),
+            Mock.Of<IJobFailureNotificationProfileRepository>(),
             uowMock.Object,
             paramResolverMock.Object,
             dsResolverMock.Object,

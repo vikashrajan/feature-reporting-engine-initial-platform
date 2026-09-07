@@ -98,6 +98,13 @@ public sealed class ReportValidator : IReportValidator
         {
             errors.Add($"Delivery provider '{report.DeliveryConfiguration.DeliveryType}' is not supported for activation.");
         }
+        else if (report.DeliveryConfiguration.DeliveryType.Equals(DeliveryTypes.Email, StringComparison.OrdinalIgnoreCase)
+            && (report.DeliveryConfiguration.SmtpConfigId.GetValueOrDefault() <= 0
+                || report.DeliveryConfiguration.SmtpConfiguration is null
+                || !report.DeliveryConfiguration.SmtpConfiguration.IsActive))
+        {
+            errors.Add("EMAIL delivery requires an active SMTP profile.");
+        }
 
         if (string.IsNullOrWhiteSpace(report.QueryText))
         {

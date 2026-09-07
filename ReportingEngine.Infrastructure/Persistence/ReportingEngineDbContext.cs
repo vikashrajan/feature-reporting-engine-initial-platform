@@ -14,6 +14,8 @@ public sealed class ReportingEngineDbContext : DbContext
     public DbSet<Schedule> Schedules => Set<Schedule>();
     public DbSet<FileConfiguration> FileConfigurations => Set<FileConfiguration>();
     public DbSet<DeliveryConfiguration> DeliveryConfigurations => Set<DeliveryConfiguration>();
+    public DbSet<SmtpConfiguration> SmtpConfigurations => Set<SmtpConfiguration>();
+    public DbSet<JobFailureNotificationProfile> JobFailureNotificationProfiles => Set<JobFailureNotificationProfile>();
     public DbSet<ReportDefinition> Reports => Set<ReportDefinition>();
     public DbSet<ReportParameter> ReportParameters => Set<ReportParameter>();
     public DbSet<JobExecution> JobExecutions => Set<JobExecution>();

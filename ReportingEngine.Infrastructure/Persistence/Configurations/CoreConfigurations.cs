@@ -97,10 +97,60 @@ public sealed class DeliveryConfigurationConfiguration : IEntityTypeConfiguratio
         builder.Property(x => x.EmailSubjectTemplate).HasMaxLength(1000);
         builder.Property(x => x.EmailBodyTemplate).HasColumnType("nvarchar(max)");
         builder.Property(x => x.SecretReference).HasMaxLength(500);
+        builder.Property(x => x.SmtpConfigId);
         builder.Property(x => x.IsFailureNotification).IsRequired().HasDefaultValue(false);
         builder.Property(x => x.IsActive).IsRequired().HasDefaultValue(true);
         builder.Property(x => x.CreatedBy).HasMaxLength(100).IsRequired();
         builder.Property(x => x.CreatedDate).IsRequired().HasDefaultValueSql("SYSUTCDATETIME()");
         builder.Property(x => x.ModifiedBy).HasMaxLength(100);
+        builder.HasOne(x => x.SmtpConfiguration).WithMany(x => x.DeliveryConfigurations).HasForeignKey(x => x.SmtpConfigId).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+public sealed class SmtpConfigurationConfiguration : IEntityTypeConfiguration<SmtpConfiguration>
+{
+    public void Configure(EntityTypeBuilder<SmtpConfiguration> builder)
+    {
+        builder.ToTable("RepScdhedularProject_SmtpConfiguration");
+        builder.HasKey(x => x.SmtpConfigId);
+        builder.Property(x => x.SmtpConfigId).ValueGeneratedOnAdd();
+        builder.Property(x => x.ProfileName).HasMaxLength(200).IsRequired();
+        builder.Property(x => x.Host).HasMaxLength(300).IsRequired();
+        builder.Property(x => x.Port).IsRequired();
+        builder.Property(x => x.EnableSsl).IsRequired().HasDefaultValue(true);
+        builder.Property(x => x.FromAddress).HasMaxLength(320).IsRequired();
+        builder.Property(x => x.FromDisplayName).HasMaxLength(200);
+        builder.Property(x => x.UserName).HasMaxLength(320);
+        builder.Property(x => x.Password).HasColumnType("nvarchar(max)");
+        builder.Property(x => x.TimeoutSeconds).IsRequired().HasDefaultValue(120);
+        builder.Property(x => x.UseFileDrop).IsRequired().HasDefaultValue(false);
+        builder.Property(x => x.FileDropPath).HasMaxLength(1000);
+        builder.Property(x => x.IsActive).IsRequired().HasDefaultValue(true);
+        builder.Property(x => x.CreatedBy).HasMaxLength(100).IsRequired();
+        builder.Property(x => x.CreatedDate).IsRequired().HasDefaultValueSql("SYSUTCDATETIME()");
+        builder.Property(x => x.ModifiedBy).HasMaxLength(100);
+        builder.HasIndex(x => x.ProfileName).IsUnique();
+    }
+}
+
+public sealed class JobFailureNotificationProfileConfiguration : IEntityTypeConfiguration<JobFailureNotificationProfile>
+{
+    public void Configure(EntityTypeBuilder<JobFailureNotificationProfile> builder)
+    {
+        builder.ToTable("RepScdhedularProject_JobFailureNotificationProfile");
+        builder.HasKey(x => x.FailureProfileId);
+        builder.Property(x => x.FailureProfileId).ValueGeneratedOnAdd();
+        builder.Property(x => x.ProfileName).HasMaxLength(200).IsRequired();
+        builder.Property(x => x.EmailTo).HasMaxLength(2000).IsRequired();
+        builder.Property(x => x.EmailCc).HasMaxLength(2000);
+        builder.Property(x => x.EmailBcc).HasMaxLength(2000);
+        builder.Property(x => x.SubjectTemplate).HasMaxLength(1000);
+        builder.Property(x => x.BodyTemplate).HasColumnType("nvarchar(max)");
+        builder.Property(x => x.IsActive).IsRequired().HasDefaultValue(true);
+        builder.Property(x => x.CreatedBy).HasMaxLength(100).IsRequired();
+        builder.Property(x => x.CreatedDate).IsRequired().HasDefaultValueSql("SYSUTCDATETIME()");
+        builder.Property(x => x.ModifiedBy).HasMaxLength(100);
+        builder.HasOne(x => x.SmtpConfiguration).WithMany(x => x.FailureNotificationProfiles).HasForeignKey(x => x.SmtpConfigId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(x => x.ProfileName).IsUnique();
     }
 }

@@ -33,7 +33,7 @@ public sealed class DeliveryConfigurationService : IDeliveryConfigurationService
 
     public async Task<DeliveryConfigurationDto> CreateAsync(CreateDeliveryConfigurationRequest request, string performedBy, CancellationToken cancellationToken = default)
     {
-        Validate(request.DeliveryType, request.EmailTo, request.DestinationReference, request.SecretReference);
+        Validate(request.DeliveryType, request.EmailTo, request.DestinationReference, request.SecretReference, request.SmtpConfigId);
 
         var entity = new DeliveryConfiguration
         {
@@ -46,6 +46,7 @@ public sealed class DeliveryConfigurationService : IDeliveryConfigurationService
             EmailSubjectTemplate = request.EmailSubjectTemplate,
             EmailBodyTemplate = request.EmailBodyTemplate,
             SecretReference = request.SecretReference,
+            SmtpConfigId = request.SmtpConfigId,
             IsFailureNotification = request.IsFailureNotification,
             IsActive = true,
             CreatedBy = performedBy,
@@ -60,7 +61,7 @@ public sealed class DeliveryConfigurationService : IDeliveryConfigurationService
 
     public async Task<DeliveryConfigurationDto> UpdateAsync(long id, UpdateDeliveryConfigurationRequest request, string performedBy, CancellationToken cancellationToken = default)
     {
-        Validate(request.DeliveryType, request.EmailTo, request.DestinationReference, request.SecretReference);
+        Validate(request.DeliveryType, request.EmailTo, request.DestinationReference, request.SecretReference, request.SmtpConfigId);
 
         var entity = await _repository.GetByIdAsync(id, cancellationToken)
             ?? throw new KeyNotFoundException($"Delivery configuration {id} was not found.");
@@ -75,6 +76,7 @@ public sealed class DeliveryConfigurationService : IDeliveryConfigurationService
         entity.EmailSubjectTemplate = request.EmailSubjectTemplate;
         entity.EmailBodyTemplate = request.EmailBodyTemplate;
         entity.SecretReference = request.SecretReference;
+        entity.SmtpConfigId = request.SmtpConfigId;
         entity.IsFailureNotification = request.IsFailureNotification;
         entity.IsActive = request.IsActive;
         entity.ModifiedBy = performedBy;
@@ -102,7 +104,7 @@ public sealed class DeliveryConfigurationService : IDeliveryConfigurationService
         await _audit.WriteAsync(nameof(DeliveryConfiguration), id, AuditActions.Delete, performedBy, old, cancellationToken: cancellationToken);
     }
 
-    internal static void Validate(string deliveryType, string? emailTo, string? destinationReference, string? secretReference = null)
+    internal static void Validate(string deliveryType, string? emailTo, string? destinationReference, string? secretReference = null, long? smtpConfigId = null)
     {
         var type = deliveryType.Trim().ToUpperInvariant();
         var valid = new[] { DeliveryTypes.Email, DeliveryTypes.Sftp, DeliveryTypes.Ftp, DeliveryTypes.SharedFolder, DeliveryTypes.Blob, DeliveryTypes.AzureFileShare, DeliveryTypes.S3 };
@@ -116,9 +118,9 @@ public sealed class DeliveryConfigurationService : IDeliveryConfigurationService
             throw new InvalidOperationException("EmailTo is required for EMAIL delivery.");
         }
 
-        if (type == DeliveryTypes.Email && string.IsNullOrWhiteSpace(secretReference))
+        if (type == DeliveryTypes.Email && smtpConfigId.GetValueOrDefault() <= 0)
         {
-            throw new InvalidOperationException("SMTP connection settings are required for EMAIL delivery.");
+            throw new InvalidOperationException("SMTP profile is required for EMAIL delivery.");
         }
 
         if (type is DeliveryTypes.SharedFolder or DeliveryTypes.Sftp or DeliveryTypes.Ftp or DeliveryTypes.Blob
@@ -139,5 +141,5 @@ public sealed class DeliveryConfigurationService : IDeliveryConfigurationService
     }
 
     private static DeliveryConfigurationDto Map(DeliveryConfiguration d) =>
-        new(d.DeliveryConfigId, d.DeliveryName, d.DeliveryType, d.DestinationReference, d.EmailTo, d.EmailCc, d.EmailBcc, d.EmailSubjectTemplate, d.EmailBodyTemplate, d.SecretReference, d.IsFailureNotification, d.IsActive);
+        new(d.DeliveryConfigId, d.DeliveryName, d.DeliveryType, d.DestinationReference, d.EmailTo, d.EmailCc, d.EmailBcc, d.EmailSubjectTemplate, d.EmailBodyTemplate, d.SecretReference, d.SmtpConfigId, d.SmtpConfiguration?.ProfileName, d.IsFailureNotification, d.IsActive);
 }

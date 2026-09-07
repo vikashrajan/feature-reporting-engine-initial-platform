@@ -12,6 +12,8 @@ public static class DependencyInjection
         services.AddScoped<IScheduleService, ScheduleService>();
         services.AddScoped<IFileConfigurationService, FileConfigurationService>();
         services.AddScoped<IDeliveryConfigurationService, DeliveryConfigurationService>();
+        services.AddScoped<ISmtpConfigurationService, SmtpConfigurationService>();
+        services.AddScoped<IJobFailureNotificationProfileService, JobFailureNotificationProfileService>();
         services.AddScoped<IReportService, ReportService>();
         services.AddScoped<IExecutionService, ExecutionService>();
         services.AddScoped<IEmailSettingsService, EmailSettingsService>();

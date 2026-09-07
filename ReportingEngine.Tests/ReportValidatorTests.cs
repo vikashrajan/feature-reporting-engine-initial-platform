@@ -116,6 +116,25 @@ public class ReportValidatorTests
         DataSource = new DataSource { DataSourceId = 1, DataSourceName = "DS1", DataSourceType = "SQL", IsActive = true },
         Schedule = new Schedule { ScheduleId = 1, ScheduleName = "SCH1", ScheduleType = ScheduleTypes.Cron, CronExpression = "0 * * * *", TimeZoneId = "UTC", IsActive = true },
         FileConfiguration = new FileConfiguration { FileConfigId = 1, ConfigurationName = "FC1", FileFormat = "CSV", FileNamePattern = "File.csv", SplitEnabled = false },
-        DeliveryConfiguration = new DeliveryConfiguration { DeliveryConfigId = 1, DeliveryName = "DC1", DeliveryType = "EMAIL", EmailTo = "test@example.com", IsActive = true }
+        DeliveryConfiguration = new DeliveryConfiguration
+        {
+            DeliveryConfigId = 1,
+            DeliveryName = "DC1",
+            DeliveryType = "EMAIL",
+            EmailTo = "test@example.com",
+            SmtpConfigId = 1,
+            SmtpConfiguration = new SmtpConfiguration
+            {
+                SmtpConfigId = 1,
+                ProfileName = "Test SMTP",
+                Host = "filedrop",
+                Port = 25,
+                FromAddress = "noreply@test.local",
+                UseFileDrop = true,
+                FileDropPath = Path.GetTempPath(),
+                IsActive = true
+            },
+            IsActive = true
+        }
     };
 }

@@ -98,7 +98,7 @@ public class JobExecutorBatchDeliveryTests : IDisposable
             reportRepo.Object,
             executionRepo.Object,
             fileRepo.Object,
-            Mock.Of<IDeliveryConfigurationRepository>(),
+            Mock.Of<IJobFailureNotificationProfileRepository>(),
             Mock.Of<IUnitOfWork>(),
             parameterResolver.Object,
             dataSourceResolver.Object,
@@ -194,7 +194,7 @@ public class JobExecutorBatchDeliveryTests : IDisposable
             reportRepo.Object,
             executionRepo.Object,
             fileRepo.Object,
-            Mock.Of<IDeliveryConfigurationRepository>(),
+            Mock.Of<IJobFailureNotificationProfileRepository>(),
             Mock.Of<IUnitOfWork>(),
             parameterResolver.Object,
             dataSourceResolver.Object,
@@ -249,7 +249,19 @@ public class JobExecutorBatchDeliveryTests : IDisposable
         {
             DeliveryConfigId = 1,
             DeliveryType = DeliveryTypes.Email,
-            EmailTo = "reports@example.com"
+            EmailTo = "reports@example.com",
+            SmtpConfigId = 1,
+            SmtpConfiguration = new SmtpConfiguration
+            {
+                SmtpConfigId = 1,
+                ProfileName = "Test SMTP",
+                Host = "filedrop",
+                Port = 25,
+                FromAddress = "noreply@test.local",
+                UseFileDrop = true,
+                FileDropPath = Path.GetTempPath(),
+                IsActive = true
+            }
         }
     };
 

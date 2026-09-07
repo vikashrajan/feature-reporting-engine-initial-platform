@@ -37,7 +37,9 @@ public sealed class EmailDeliveryProvider : IDeliveryProvider
 
         var subject = ReplaceTokens(request.EmailSubjectTemplate ?? "Report {ReportCode}", request.Tokens);
         var body = ReplaceTokens(request.EmailBodyTemplate ?? "<p>Report {ReportCode} generated with {RecordCount} records in {FileCount} file(s).</p>", request.Tokens);
-        var smtpConfig = EmailConnectionConfig.From(_options, request.SecretReference);
+        var smtpConfig = request.SmtpConnection is null
+            ? EmailConnectionConfig.From(_options, request.SecretReference)
+            : EmailConnectionConfig.From(request.SmtpConnection);
         smtpConfig.Validate();
 
         if (smtpConfig.UseFileDrop)
@@ -223,6 +225,21 @@ public sealed class EmailConnectionConfig
 
         return cfg;
     }
+
+    public static EmailConnectionConfig From(SmtpConnectionSettings settings) =>
+        new()
+        {
+            Host = settings.Host,
+            Port = settings.Port,
+            EnableSsl = settings.EnableSsl,
+            FromAddress = settings.FromAddress,
+            FromDisplayName = settings.FromDisplayName,
+            UserName = settings.UserName,
+            Password = settings.Password,
+            TimeoutSeconds = settings.TimeoutSeconds,
+            UseFileDrop = settings.UseFileDrop,
+            FileDropPath = settings.FileDropPath ?? "./temp-emails"
+        };
 
     private static void ParseKeyValuePairs(string str, EmailConnectionConfig cfg)
     {

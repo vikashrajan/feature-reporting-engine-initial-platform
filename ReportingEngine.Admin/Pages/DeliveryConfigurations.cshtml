@@ -1,23 +1,13 @@
 @page
 @model ReportingEngine.Admin.Pages.DeliveryConfigurationsModel
-<h1>Delivery & Connection Settings</h1>
+<h1>Delivery Profiles</h1>
 <div id="msg"></div>
 
-<style>
-  tr.selected-row {
-    background-color: #dbeafe !important;
-    border-left: 4px solid #2563eb !important;
-  }
-  tr.selected-row td {
-    font-weight: 600;
-  }
-</style>
-
 <div class="panel">
-  <h3 id="deliveryFormTitle">Create / Edit Delivery Target or SMTP Profile</h3>
+  <h3 id="formTitle">Create / Edit Delivery Profile</h3>
   <div class="grid-2">
-    <div><label>Delivery ID (auto for Edit)</label><input id="dId" readonly style="background:#f3f4f6;" /></div>
-    <div><label>Delivery Profile Name</label><input id="dName" placeholder="e.g. Gmail Reports or Azure File Share" /></div>
+    <div><label>ID</label><input id="dId" readonly style="background:#f3f4f6;" /></div>
+    <div><label>Profile Name</label><input id="dName" placeholder="e.g. Customer Report Email" /></div>
     <div><label>Delivery Type</label>
       <select id="dType" onchange="toggleTypeFields()">
         <option value="EMAIL">EMAIL</option>
@@ -30,324 +20,113 @@
       </select>
     </div>
     <div><label>Status</label><select id="dActive"><option value="true">Active</option><option value="false">Inactive</option></select></div>
-
-    <div id="destRefGroup"><label>Destination / Path Reference</label><input id="dDest" placeholder="Path or folder" /></div>
-    <div id="secretRefGroup"><label>Secret / Connection Reference</label><input id="dSecret" placeholder="Connection string, JSON, or key-value secret" /></div>
-
-    <div id="emailToGroup"><label>Recipient Email(s)</label><input id="dTo" placeholder="comma separated emails" /></div>
-    <div id="emailCcGroup"><label>CC Email(s)</label><input id="dCc" placeholder="optional" /></div>
-    <div id="emailBccGroup"><label>BCC Email(s)</label><input id="dBcc" placeholder="optional" /></div>
-    <div id="emailSubjectGroup"><label>Email Subject Template</label><input id="dSubject" value="Report {ReportCode} - {ExecutionDate}" /></div>
-    <div id="emailBodyGroup"><label>Email Body Template (HTML)</label><input id="dBody" value="<p>Customer {CustomerCode}: {RecordCount} records generated in {FileCount} file(s).</p>" /></div>
-    <div id="failProfileGroup"><label>Use For Job Failure Notifications</label><select id="dFailureProfile"><option value="false">false</option><option value="true">true</option></select></div>
-
-    <div class="emailSmtpField"><label>Profile SMTP Host</label><input id="dSmtpHost" placeholder="smtp.gmail.com" /></div>
-    <div class="emailSmtpField"><label>Profile SMTP Port</label><input id="dSmtpPort" type="number" placeholder="587" /></div>
-    <div class="emailSmtpField"><label>Profile SSL / TLS</label><select id="dSmtpSsl"><option value="">Use default</option><option value="true">true</option><option value="false">false</option></select></div>
-    <div class="emailSmtpField"><label>Profile From Email</label><input id="dSmtpFromAddr" placeholder="optional override" /></div>
-    <div class="emailSmtpField"><label>Profile From Name</label><input id="dSmtpFromName" placeholder="optional override" /></div>
-    <div class="emailSmtpField"><label>Profile SMTP Username</label><input id="dSmtpUser" placeholder="optional override" /></div>
-    <div class="emailSmtpField"><label>Profile SMTP Password</label><input id="dSmtpPass" type="password" placeholder="optional override" /></div>
-    <div class="emailSmtpField"><label>Profile Timeout Seconds</label><input id="dSmtpTimeout" type="number" min="1" placeholder="120" /></div>
-    <div class="emailSmtpField"><label>Profile File Drop Mode</label><select id="dSmtpDrop"><option value="">Use default</option><option value="true">true</option><option value="false">false</option></select></div>
-    <div class="emailSmtpField"><label>Profile File Drop Directory</label><input id="dSmtpDropPath" placeholder="optional override" /></div>
-
-    <div class="azureField"><label>Azure Storage Connection String</label><input id="azConnection" type="password" placeholder="DefaultEndpointsProtocol=..." /></div>
+    <div class="emailField"><label>SMTP Profile</label><select id="dSmtpConfigId"></select></div>
+    <div class="emailField"><label>To Email(s)</label><input id="dTo" placeholder="comma separated emails" /></div>
+    <div class="emailField"><label>CC Email(s)</label><input id="dCc" /></div>
+    <div class="emailField"><label>BCC Email(s)</label><input id="dBcc" /></div>
+    <div class="emailField"><label>Subject Template</label><input id="dSubject" value="Report {ReportCode} - {ExecutionDate}" /></div>
+    <div class="emailField"><label>Body Template (HTML)</label><input id="dBody" value="<p>Customer {CustomerCode}: {RecordCount} records generated in {FileCount} file(s).</p>" /></div>
+    <div id="destRefGroup"><label>Destination / Path Reference</label><input id="dDest" /></div>
+    <div id="secretRefGroup"><label>Secret / Connection Reference</label><input id="dSecret" /></div>
+    <div class="azureField"><label>Azure Storage Connection String</label><input id="azConnection" type="password" /></div>
     <div class="azureField"><label>Azure File Share Name</label><input id="azShare" placeholder="childfolder" /></div>
-    <div class="azureField"><label>Azure Directory Path</label><input id="azPath" placeholder="optional folder inside share" /></div>
-
-    <div class="s3Field"><label>S3 Access Key ID</label><input id="s3AccessKey" placeholder="optional if server role/profile is used" /></div>
-    <div class="s3Field"><label>S3 Secret Access Key</label><input id="s3SecretKey" type="password" placeholder="optional if server role/profile is used" /></div>
-    <div class="s3Field"><label>S3 Region</label><input id="s3Region" placeholder="us-east-1" /></div>
-    <div class="s3Field"><label>S3 Bucket Name</label><input id="s3Bucket" placeholder="my-report-bucket" /></div>
-    <div class="s3Field"><label>S3 Folder / Prefix</label><input id="s3Prefix" placeholder="reports/{ReportCode}" /></div>
-    <div class="s3Field"><label>S3 Service URL</label><input id="s3ServiceUrl" placeholder="optional custom S3-compatible endpoint" /></div>
+    <div class="azureField"><label>Azure Directory Path</label><input id="azPath" /></div>
+    <div class="s3Field"><label>S3 Access Key ID</label><input id="s3AccessKey" /></div>
+    <div class="s3Field"><label>S3 Secret Access Key</label><input id="s3SecretKey" type="password" /></div>
+    <div class="s3Field"><label>S3 Region</label><input id="s3Region" value="us-east-1" /></div>
+    <div class="s3Field"><label>S3 Bucket Name</label><input id="s3Bucket" /></div>
+    <div class="s3Field"><label>S3 Folder / Prefix</label><input id="s3Prefix" /></div>
+    <div class="s3Field"><label>S3 Service URL</label><input id="s3ServiceUrl" /></div>
     <div class="s3Field"><label>Force Path Style</label><select id="s3ForcePath"><option value="false">false</option><option value="true">true</option></select></div>
   </div>
   <div style="margin-top:0.75rem;">
-    <button onclick="createDelivery()">Create Delivery Target</button>
-    <button class="secondary" onclick="updateDelivery()">Update Delivery Target</button>
-    <button class="secondary" onclick="resetDeliveryForm()">Clear / New</button>
-    <button class="secondary" onclick="testSftpConnection()" id="btnTestSftp" style="display:none;">Test SFTP Connection</button>
+    <button onclick="createDelivery()">Create</button>
+    <button class="secondary" onclick="updateDelivery()">Update</button>
+    <button class="secondary" onclick="resetForm()">Clear</button>
+    <button class="secondary" onclick="testSftpConnection()" id="btnTestSftp" style="display:none;">Test SFTP</button>
   </div>
 </div>
 
 <div class="panel">
-  <h3>Delivery Configurations</h3>
+  <h3>Delivery Profiles</h3>
   <table>
-    <thead>
-      <tr>
-        <th>Id</th>
-        <th>Name</th>
-        <th>Type</th>
-        <th>Target</th>
-        <th>Connection</th>
-        <th>Failure Email</th>
-        <th>Status</th>
-        <th>Actions</th>
-      </tr>
-    </thead>
+    <thead><tr><th>Id</th><th>Name</th><th>Type</th><th>Target</th><th>Connection</th><th>Status</th><th>Actions</th></tr></thead>
     <tbody id="rows"></tbody>
   </table>
 </div>
 
 @section Scripts {
 <script>
-let currentSelectedId = null;
-
-function escapeHtml(value) {
-  return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-}
-
-function tryParseJson(value) {
-  if (!value || !value.trim().startsWith('{')) return {};
-  try { return JSON.parse(value); } catch { return {}; }
-}
-
-function buildEmailSecret() {
-  const secret = {};
-  if (dSmtpHost.value) secret.Host = dSmtpHost.value;
-  if (dSmtpPort.value) secret.Port = Number(dSmtpPort.value);
-  if (dSmtpSsl.value) secret.EnableSsl = dSmtpSsl.value === 'true';
-  if (dSmtpFromAddr.value) secret.FromAddress = dSmtpFromAddr.value;
-  if (dSmtpFromName.value) secret.FromDisplayName = dSmtpFromName.value;
-  if (dSmtpUser.value) secret.UserName = dSmtpUser.value;
-  if (dSmtpPass.value) secret.Password = dSmtpPass.value;
-  if (dSmtpTimeout.value) secret.SmtpTimeoutSeconds = Number(dSmtpTimeout.value);
-  if (dSmtpDrop.value) secret.UseFileDrop = dSmtpDrop.value === 'true';
-  if (dSmtpDropPath.value) secret.FileDropPath = dSmtpDropPath.value;
-  return Object.keys(secret).length ? JSON.stringify(secret) : null;
-}
-
-function buildAzureSecret() {
-  return JSON.stringify({
-    ConnectionString: azConnection.value,
-    ShareName: azShare.value,
-    DirectoryPath: azPath.value || ''
-  });
-}
-
+function escapeHtml(value) { return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function tryParseJson(value) { if (!value || !value.trim().startsWith('{')) return {}; try { return JSON.parse(value); } catch { return {}; } }
+function buildAzureSecret() { return JSON.stringify({ ConnectionString: azConnection.value, ShareName: azShare.value, DirectoryPath: azPath.value || '' }); }
 function buildS3Secret() {
-  return JSON.stringify({
-    AccessKeyId: s3AccessKey.value || null,
-    SecretAccessKey: s3SecretKey.value || null,
-    Region: s3Region.value || 'us-east-1',
-    BucketName: s3Bucket.value,
-    Prefix: s3Prefix.value || '',
-    ServiceUrl: s3ServiceUrl.value || null,
-    ForcePathStyle: s3ForcePath.value === 'true'
-  });
+  return JSON.stringify({ AccessKeyId: s3AccessKey.value || null, SecretAccessKey: s3SecretKey.value || null, Region: s3Region.value || 'us-east-1', BucketName: s3Bucket.value, Prefix: s3Prefix.value || '', ServiceUrl: s3ServiceUrl.value || null, ForcePathStyle: s3ForcePath.value === 'true' });
 }
-
-function deliveryRequest(includeActive) {
+function request(includeActive) {
   const type = dType.value;
-  const request = {
-    deliveryName: dName.value,
-    deliveryType: type,
-    destinationReference: dDest.value || null,
-    emailTo: type === 'EMAIL' ? dTo.value : null,
-    emailCc: type === 'EMAIL' ? (dCc.value || null) : null,
+  const body = {
+    deliveryName: dName.value, deliveryType: type, destinationReference: dDest.value || null,
+    emailTo: type === 'EMAIL' ? dTo.value : null, emailCc: type === 'EMAIL' ? (dCc.value || null) : null,
     emailBcc: type === 'EMAIL' ? (dBcc.value || null) : null,
-    emailSubjectTemplate: type === 'EMAIL' ? dSubject.value : null,
-    emailBodyTemplate: type === 'EMAIL' ? dBody.value : null,
-    secretReference: dSecret.value || null
+    emailSubjectTemplate: type === 'EMAIL' ? dSubject.value : null, emailBodyTemplate: type === 'EMAIL' ? dBody.value : null,
+    secretReference: dSecret.value || null, smtpConfigId: type === 'EMAIL' ? Number(dSmtpConfigId.value || 0) : null, isFailureNotification: false
   };
-
-  if (type === 'EMAIL') request.secretReference = buildEmailSecret();
-  if (type === 'AZURE_FILE_SHARE') {
-    request.destinationReference = azPath.value || null;
-    request.secretReference = buildAzureSecret();
-  }
-  if (type === 'S3') {
-    request.destinationReference = s3Prefix.value || null;
-    request.secretReference = buildS3Secret();
-  }
-  request.isFailureNotification = isEmail && dFailureProfile.value === 'true';
-  if (includeActive) request.isActive = dActive.value === 'true';
-  return request;
+  if (type === 'AZURE_FILE_SHARE') { body.destinationReference = azPath.value || null; body.secretReference = buildAzureSecret(); }
+  if (type === 'S3') { body.destinationReference = s3Prefix.value || null; body.secretReference = buildS3Secret(); }
+  if (includeActive) body.isActive = dActive.value === 'true';
+  return body;
 }
-
 function toggleTypeFields() {
-  const type = dType.value;
-  const isEmail = type === 'EMAIL';
-  const isSftp = type === 'SFTP';
-  const isAzure = type === 'AZURE_FILE_SHARE';
-  const isS3 = type === 'S3';
-
-  [emailToGroup, emailCcGroup, emailBccGroup, emailSubjectGroup, emailBodyGroup, failProfileGroup].forEach(x => x.style.display = isEmail ? 'block' : 'none');
-  document.querySelectorAll('.emailSmtpField').forEach(x => x.style.display = isEmail ? 'block' : 'none');
+  const type = dType.value, isEmail = type === 'EMAIL', isAzure = type === 'AZURE_FILE_SHARE', isS3 = type === 'S3';
+  document.querySelectorAll('.emailField').forEach(x => x.style.display = isEmail ? 'block' : 'none');
   document.querySelectorAll('.azureField').forEach(x => x.style.display = isAzure ? 'block' : 'none');
   document.querySelectorAll('.s3Field').forEach(x => x.style.display = isS3 ? 'block' : 'none');
   destRefGroup.style.display = (!isEmail && !isAzure && !isS3) ? 'block' : 'none';
   secretRefGroup.style.display = (!isEmail && !isAzure && !isS3) ? 'block' : 'none';
-  btnTestSftp.style.display = isSftp ? 'inline-block' : 'none';
-
-  if (isSftp && !dDest.value) {
-    dDest.value = "/upload/reports";
-    dSecret.value = "Host=sftp.example.com;Port=22;Username=sftpuser;Password=sftppass";
-  }
+  btnTestSftp.style.display = type === 'SFTP' ? 'inline-block' : 'none';
 }
-
-async function testSftpConnection() {
-  try {
-    const res = await api.send('/api/deliveryconfigurations/test-sftp', 'POST', {
-      destinationReference: dDest.value,
-      secretReference: dSecret.value
-    });
-    showMsg(msg, res.message || 'SFTP connection test successful!', true);
-  } catch(e) { showMsg(msg, 'SFTP Test Failed: ' + e.message, false); }
+async function loadSmtpProfiles() {
+  const profiles = await api.get('/api/smtpconfigurations');
+  dSmtpConfigId.innerHTML = '<option value="">Select SMTP Profile</option>' + profiles.filter(x => x.isActive).map(x => `<option value="${x.smtpConfigId}">${escapeHtml(x.profileName)}</option>`).join('');
 }
-
 function describeConnection(x) {
   const secret = tryParseJson(x.secretReference);
-  if (x.deliveryType === 'EMAIL') return secret.Host ? `SMTP: ${escapeHtml(secret.Host)}:${escapeHtml(secret.Port || '')}` : 'Default SMTP';
+  if (x.deliveryType === 'EMAIL') return x.smtpProfileName ? `SMTP: ${escapeHtml(x.smtpProfileName)}` : '<span style="color:var(--danger)">SMTP missing</span>';
   if (x.deliveryType === 'AZURE_FILE_SHARE') return `Share: ${escapeHtml(secret.ShareName || '-')}`;
   if (x.deliveryType === 'S3') return `Bucket: ${escapeHtml(secret.BucketName || '-')}`;
   return x.secretReference ? '<span style="color:var(--muted);">Configured</span>' : '(none)';
 }
-
+async function testSftpConnection() {
+  try { const res = await api.send('/api/deliveryconfigurations/test-sftp', 'POST', { destinationReference: dDest.value, secretReference: dSecret.value }); showMsg(msg, res.message || 'SFTP connection test successful.', true); }
+  catch(e) { showMsg(msg, 'SFTP Test Failed: ' + e.message, false); }
+}
 async function load() {
+  await loadSmtpProfiles();
   const items = await api.get('/api/deliveryconfigurations');
   rows.innerHTML = items.map(x => {
     const secret = tryParseJson(x.secretReference);
-    const target = x.deliveryType === 'EMAIL'
-      ? 'Email: ' + escapeHtml(x.emailTo || '-')
-      : x.deliveryType === 'AZURE_FILE_SHARE'
-        ? escapeHtml(secret.DirectoryPath || x.destinationReference || 'Share root')
-        : x.deliveryType === 'S3'
-          ? escapeHtml(secret.Prefix || x.destinationReference || 'Bucket root')
-        : escapeHtml(x.destinationReference || '-');
-
-    return `<tr id="row-${x.deliveryConfigId}" class="${currentSelectedId == x.deliveryConfigId ? 'selected-row' : ''}">
-      <td><strong>${x.deliveryConfigId}</strong></td>
-      <td><strong>${escapeHtml(x.deliveryName)}</strong></td>
-      <td><span class="badge ${escapeHtml(x.deliveryType.toLowerCase())}">${escapeHtml(x.deliveryType)}</span></td>
-      <td>${target}</td>
-      <td>${describeConnection(x)}</td>
-      <td>${x.isFailureNotification ? 'Yes' : 'No'}</td>
-      <td>${x.isActive ? '<span style="color:var(--ok)">Active</span>' : 'Inactive'}</td>
-      <td>
-        <button class="secondary" onclick="editDelivery(${x.deliveryConfigId})">Edit</button>
-        <button class="danger" onclick="deleteDelivery(${x.deliveryConfigId}, '${escapeHtml(x.deliveryName).replace(/'/g, "\\'")}')">Delete</button>
-      </td>
-    </tr>`;
+    const target = x.deliveryType === 'EMAIL' ? 'Email: ' + escapeHtml(x.emailTo || '-') : x.deliveryType === 'AZURE_FILE_SHARE' ? escapeHtml(secret.DirectoryPath || x.destinationReference || 'Share root') : x.deliveryType === 'S3' ? escapeHtml(secret.Prefix || x.destinationReference || 'Bucket root') : escapeHtml(x.destinationReference || '-');
+    return `<tr><td><strong>${x.deliveryConfigId}</strong></td><td><strong>${escapeHtml(x.deliveryName)}</strong></td><td><span class="badge">${escapeHtml(x.deliveryType)}</span></td><td>${target}</td><td>${describeConnection(x)}</td><td>${x.isActive ? '<span style="color:var(--ok)">Active</span>' : 'Inactive'}</td><td><button class="secondary" onclick="editDelivery(${x.deliveryConfigId})">Edit</button> <button class="danger" onclick="deleteDelivery(${x.deliveryConfigId}, '${escapeHtml(x.deliveryName).replace(/'/g, "\\'")}')">Delete</button></td></tr>`;
   }).join('');
 }
-
-async function createDelivery() {
-  try {
-    await api.send('/api/deliveryconfigurations', 'POST', deliveryRequest(false));
-    showMsg(msg, 'Delivery configuration created successfully!', true);
-    resetDeliveryForm();
-    await load();
-  } catch(e) { showMsg(msg, e.message, false); }
-}
-
-async function updateDelivery() {
-  try {
-    if (!dId.value) throw new Error("Please select a delivery configuration from the table to edit first.");
-    await api.send('/api/deliveryconfigurations/' + dId.value, 'PUT', deliveryRequest(true));
-    showMsg(msg, 'Delivery configuration updated successfully!', true);
-    resetDeliveryForm();
-    await load();
-  } catch(e) { showMsg(msg, e.message, false); }
-}
-
+async function createDelivery() { try { await api.send('/api/deliveryconfigurations', 'POST', request(false)); showMsg(msg, 'Delivery profile created.', true); resetForm(); await load(); } catch(e) { showMsg(msg, e.message, false); } }
+async function updateDelivery() { try { if (!dId.value) throw new Error('Please select a delivery profile first.'); await api.send('/api/deliveryconfigurations/' + dId.value, 'PUT', request(true)); showMsg(msg, 'Delivery profile updated.', true); resetForm(); await load(); } catch(e) { showMsg(msg, e.message, false); } }
 async function editDelivery(id) {
   const x = await api.get('/api/deliveryconfigurations/' + id);
-  currentSelectedId = id;
-  dId.value = x.deliveryConfigId;
-  dName.value = x.deliveryName || '';
-  dType.value = x.deliveryType || 'EMAIL';
-  dActive.value = x.isActive ? 'true' : 'false';
-  dDest.value = x.destinationReference || '';
-  dSecret.value = x.secretReference || '';
-  dTo.value = x.emailTo || '';
-  dCc.value = x.emailCc || '';
-  dBcc.value = x.emailBcc || '';
-  dSubject.value = x.emailSubjectTemplate || 'Report {ReportCode} - {ExecutionDate}';
-  dBody.value = x.emailBodyTemplate || '<p>Customer {CustomerCode}: {RecordCount} records generated in {FileCount} file(s).</p>';
-  dFailureProfile.value = x.isFailureNotification ? 'true' : 'false';
-
+  dId.value = x.deliveryConfigId; dName.value = x.deliveryName || ''; dType.value = x.deliveryType || 'EMAIL'; dActive.value = x.isActive ? 'true' : 'false';
+  dDest.value = x.destinationReference || ''; dSecret.value = x.secretReference || ''; dTo.value = x.emailTo || ''; dCc.value = x.emailCc || ''; dBcc.value = x.emailBcc || ''; dSmtpConfigId.value = x.smtpConfigId || '';
+  dSubject.value = x.emailSubjectTemplate || 'Report {ReportCode} - {ExecutionDate}'; dBody.value = x.emailBodyTemplate || '<p>Customer {CustomerCode}: {RecordCount} records generated in {FileCount} file(s).</p>';
   const secret = tryParseJson(x.secretReference);
-  dSmtpHost.value = secret.Host || '';
-  dSmtpPort.value = secret.Port || '';
-  dSmtpSsl.value = secret.EnableSsl === true ? 'true' : secret.EnableSsl === false ? 'false' : '';
-  dSmtpFromAddr.value = secret.FromAddress || '';
-  dSmtpFromName.value = secret.FromDisplayName || '';
-  dSmtpUser.value = secret.UserName || secret.Username || '';
-  dSmtpPass.value = secret.Password || '';
-  dSmtpTimeout.value = secret.SmtpTimeoutSeconds || '';
-  dSmtpDrop.value = secret.UseFileDrop === true ? 'true' : secret.UseFileDrop === false ? 'false' : '';
-  dSmtpDropPath.value = secret.FileDropPath || '';
-  azConnection.value = secret.ConnectionString || '';
-  azShare.value = secret.ShareName || '';
-  azPath.value = secret.DirectoryPath || x.destinationReference || '';
-  s3AccessKey.value = secret.AccessKeyId || secret.AccessKey || '';
-  s3SecretKey.value = secret.SecretAccessKey || secret.SecretKey || '';
-  s3Region.value = secret.Region || 'us-east-1';
-  s3Bucket.value = secret.BucketName || secret.Bucket || '';
-  s3Prefix.value = secret.Prefix || secret.Path || x.destinationReference || '';
-  s3ServiceUrl.value = secret.ServiceUrl || secret.ServiceURL || '';
-  s3ForcePath.value = secret.ForcePathStyle === true ? 'true' : 'false';
-
-  toggleTypeFields();
-  deliveryFormTitle.innerText = `Edit Delivery Target #${x.deliveryConfigId} (${x.deliveryName})`;
-  document.querySelectorAll('#rows tr').forEach(r => r.classList.remove('selected-row'));
-  const targetRow = document.getElementById('row-' + id);
-  if (targetRow) targetRow.classList.add('selected-row');
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  azConnection.value = secret.ConnectionString || ''; azShare.value = secret.ShareName || ''; azPath.value = secret.DirectoryPath || x.destinationReference || '';
+  s3AccessKey.value = secret.AccessKeyId || secret.AccessKey || ''; s3SecretKey.value = secret.SecretAccessKey || secret.SecretKey || ''; s3Region.value = secret.Region || 'us-east-1'; s3Bucket.value = secret.BucketName || secret.Bucket || ''; s3Prefix.value = secret.Prefix || secret.Path || x.destinationReference || ''; s3ServiceUrl.value = secret.ServiceUrl || secret.ServiceURL || ''; s3ForcePath.value = secret.ForcePathStyle === true ? 'true' : 'false';
+  toggleTypeFields(); formTitle.innerText = `Edit Delivery Profile #${x.deliveryConfigId}`; window.scrollTo({ top: 0, behavior: 'smooth' });
 }
-
-async function deleteDelivery(id, label) {
-  if (!confirm(`Delete delivery configuration "${label}"?`)) return;
-  try {
-    await api.send('/api/deliveryconfigurations/' + id, 'DELETE');
-    showMsg(msg, 'Delivery configuration deleted successfully!', true);
-    resetDeliveryForm();
-    await load();
-  } catch(e) { showMsg(msg, e.message, false); }
+async function deleteDelivery(id, label) { if (!confirm(`Delete delivery profile "${label}"?`)) return; try { await api.send('/api/deliveryconfigurations/' + id, 'DELETE'); showMsg(msg, 'Delivery profile deleted.', true); resetForm(); await load(); } catch(e) { showMsg(msg, e.message, false); } }
+function resetForm() {
+  dId.value = ''; dName.value = ''; dType.value = 'EMAIL'; dActive.value = 'true'; dDest.value = ''; dSecret.value = ''; dSmtpConfigId.value = ''; dTo.value = ''; dCc.value = ''; dBcc.value = ''; dSubject.value = 'Report {ReportCode} - {ExecutionDate}'; dBody.value = '<p>Customer {CustomerCode}: {RecordCount} records generated in {FileCount} file(s).</p>';
+  azConnection.value = ''; azShare.value = ''; azPath.value = ''; s3AccessKey.value = ''; s3SecretKey.value = ''; s3Region.value = 'us-east-1'; s3Bucket.value = ''; s3Prefix.value = ''; s3ServiceUrl.value = ''; s3ForcePath.value = 'false'; formTitle.innerText = 'Create / Edit Delivery Profile'; toggleTypeFields();
 }
-
-function resetDeliveryForm() {
-  currentSelectedId = null;
-  dId.value = '';
-  dName.value = '';
-  dType.value = 'EMAIL';
-  dActive.value = 'true';
-  dDest.value = '';
-  dSecret.value = '';
-  dTo.value = '';
-  dCc.value = '';
-  dBcc.value = '';
-  dSubject.value = 'Report {ReportCode} - {ExecutionDate}';
-  dBody.value = '<p>Customer {CustomerCode}: {RecordCount} records generated in {FileCount} file(s).</p>';
-  dFailureProfile.value = 'false';
-  dSmtpHost.value = '';
-  dSmtpPort.value = '';
-  dSmtpSsl.value = '';
-  dSmtpFromAddr.value = '';
-  dSmtpFromName.value = '';
-  dSmtpUser.value = '';
-  dSmtpPass.value = '';
-  dSmtpTimeout.value = '';
-  dSmtpDrop.value = '';
-  dSmtpDropPath.value = '';
-  azConnection.value = '';
-  azShare.value = '';
-  azPath.value = '';
-  s3AccessKey.value = '';
-  s3SecretKey.value = '';
-  s3Region.value = 'us-east-1';
-  s3Bucket.value = '';
-  s3Prefix.value = '';
-  s3ServiceUrl.value = '';
-  s3ForcePath.value = 'false';
-  deliveryFormTitle.innerText = 'Create / Edit Delivery Target';
-  toggleTypeFields();
-  document.querySelectorAll('#rows tr').forEach(r => r.classList.remove('selected-row'));
-}
-
 toggleTypeFields();
 load();
 </script>

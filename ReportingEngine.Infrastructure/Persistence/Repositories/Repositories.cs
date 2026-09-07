@@ -154,16 +154,15 @@ public sealed class DeliveryConfigurationRepository : IDeliveryConfigurationRepo
     public DeliveryConfigurationRepository(ReportingEngineDbContext db) => _db = db;
 
     public async Task<IReadOnlyList<DeliveryConfiguration>> GetAllAsync(CancellationToken cancellationToken = default) =>
-        await _db.DeliveryConfigurations.AsNoTracking().OrderBy(x => x.DeliveryName).ToListAsync(cancellationToken);
-
-    public Task<DeliveryConfiguration?> GetByIdAsync(long id, CancellationToken cancellationToken = default) =>
-        _db.DeliveryConfigurations.FirstOrDefaultAsync(x => x.DeliveryConfigId == id, cancellationToken);
-
-    public async Task<IReadOnlyList<DeliveryConfiguration>> GetFailureNotificationProfilesAsync(CancellationToken cancellationToken = default) =>
         await _db.DeliveryConfigurations.AsNoTracking()
-            .Where(x => x.IsActive && x.IsFailureNotification && x.DeliveryType == DeliveryTypes.Email)
+            .Include(x => x.SmtpConfiguration)
             .OrderBy(x => x.DeliveryName)
             .ToListAsync(cancellationToken);
+
+    public Task<DeliveryConfiguration?> GetByIdAsync(long id, CancellationToken cancellationToken = default) =>
+        _db.DeliveryConfigurations
+            .Include(x => x.SmtpConfiguration)
+            .FirstOrDefaultAsync(x => x.DeliveryConfigId == id, cancellationToken);
 
     public Task<bool> IsReferencedAsync(long id, CancellationToken cancellationToken = default) =>
         _db.Reports.AnyAsync(x => x.DeliveryConfigId == id, cancellationToken);
@@ -187,6 +186,82 @@ public sealed class DeliveryConfigurationRepository : IDeliveryConfigurationRepo
     }
 }
 
+public sealed class SmtpConfigurationRepository : ISmtpConfigurationRepository
+{
+    private readonly ReportingEngineDbContext _db;
+    public SmtpConfigurationRepository(ReportingEngineDbContext db) => _db = db;
+
+    public async Task<IReadOnlyList<SmtpConfiguration>> GetAllAsync(CancellationToken cancellationToken = default) =>
+        await _db.SmtpConfigurations.AsNoTracking().OrderBy(x => x.ProfileName).ToListAsync(cancellationToken);
+
+    public Task<SmtpConfiguration?> GetByIdAsync(long id, CancellationToken cancellationToken = default) =>
+        _db.SmtpConfigurations.FirstOrDefaultAsync(x => x.SmtpConfigId == id, cancellationToken);
+
+    public async Task<bool> IsReferencedAsync(long id, CancellationToken cancellationToken = default) =>
+        await _db.DeliveryConfigurations.AnyAsync(x => x.SmtpConfigId == id, cancellationToken)
+        || await _db.JobFailureNotificationProfiles.AnyAsync(x => x.SmtpConfigId == id, cancellationToken);
+
+    public async Task<SmtpConfiguration> AddAsync(SmtpConfiguration entity, CancellationToken cancellationToken = default)
+    {
+        await _db.SmtpConfigurations.AddAsync(entity, cancellationToken);
+        return entity;
+    }
+
+    public Task UpdateAsync(SmtpConfiguration entity, CancellationToken cancellationToken = default)
+    {
+        _db.SmtpConfigurations.Update(entity);
+        return Task.CompletedTask;
+    }
+
+    public Task DeleteAsync(SmtpConfiguration entity, CancellationToken cancellationToken = default)
+    {
+        _db.SmtpConfigurations.Remove(entity);
+        return Task.CompletedTask;
+    }
+}
+
+public sealed class JobFailureNotificationProfileRepository : IJobFailureNotificationProfileRepository
+{
+    private readonly ReportingEngineDbContext _db;
+    public JobFailureNotificationProfileRepository(ReportingEngineDbContext db) => _db = db;
+
+    public async Task<IReadOnlyList<JobFailureNotificationProfile>> GetAllAsync(CancellationToken cancellationToken = default) =>
+        await _db.JobFailureNotificationProfiles.AsNoTracking()
+            .Include(x => x.SmtpConfiguration)
+            .OrderBy(x => x.ProfileName)
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<JobFailureNotificationProfile>> GetActiveAsync(CancellationToken cancellationToken = default) =>
+        await _db.JobFailureNotificationProfiles.AsNoTracking()
+            .Include(x => x.SmtpConfiguration)
+            .Where(x => x.IsActive && x.SmtpConfiguration.IsActive)
+            .OrderBy(x => x.ProfileName)
+            .ToListAsync(cancellationToken);
+
+    public Task<JobFailureNotificationProfile?> GetByIdAsync(long id, CancellationToken cancellationToken = default) =>
+        _db.JobFailureNotificationProfiles
+            .Include(x => x.SmtpConfiguration)
+            .FirstOrDefaultAsync(x => x.FailureProfileId == id, cancellationToken);
+
+    public async Task<JobFailureNotificationProfile> AddAsync(JobFailureNotificationProfile entity, CancellationToken cancellationToken = default)
+    {
+        await _db.JobFailureNotificationProfiles.AddAsync(entity, cancellationToken);
+        return entity;
+    }
+
+    public Task UpdateAsync(JobFailureNotificationProfile entity, CancellationToken cancellationToken = default)
+    {
+        _db.JobFailureNotificationProfiles.Update(entity);
+        return Task.CompletedTask;
+    }
+
+    public Task DeleteAsync(JobFailureNotificationProfile entity, CancellationToken cancellationToken = default)
+    {
+        _db.JobFailureNotificationProfiles.Remove(entity);
+        return Task.CompletedTask;
+    }
+}
+
 public sealed class ReportRepository : IReportRepository
 {
     private readonly ReportingEngineDbContext _db;
@@ -199,6 +274,7 @@ public sealed class ReportRepository : IReportRepository
             .Include(x => x.Schedule)
             .Include(x => x.FileConfiguration)
             .Include(x => x.DeliveryConfiguration)
+            .ThenInclude(x => x.SmtpConfiguration)
             .Include(x => x.Parameters)
             .OrderBy(x => x.ReportName).ToListAsync(cancellationToken);
 
@@ -212,6 +288,7 @@ public sealed class ReportRepository : IReportRepository
             .Include(x => x.Schedule)
             .Include(x => x.FileConfiguration)
             .Include(x => x.DeliveryConfiguration)
+            .ThenInclude(x => x.SmtpConfiguration)
             .Include(x => x.Parameters)
             .FirstOrDefaultAsync(x => x.ReportId == id, cancellationToken);
 

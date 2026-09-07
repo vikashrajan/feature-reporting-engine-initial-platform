@@ -20,7 +20,7 @@ public class RetryBehaviorAndStateTransitionTests
     private readonly Mock<IReportRepository> _reportRepoMock = new();
     private readonly Mock<IJobExecutionRepository> _executionRepoMock = new();
     private readonly Mock<IFileExecutionRepository> _fileRepoMock = new();
-    private readonly Mock<IDeliveryConfigurationRepository> _deliveryConfigRepoMock = new();
+    private readonly Mock<IJobFailureNotificationProfileRepository> _failureProfileRepoMock = new();
     private readonly Mock<IUnitOfWork> _uowMock = new();
     private readonly Mock<IParameterResolver> _paramResolverMock = new();
     private readonly Mock<IDataSourceProviderResolver> _dsResolverMock = new();
@@ -37,7 +37,7 @@ public class RetryBehaviorAndStateTransitionTests
         _reportRepoMock.Object,
         _executionRepoMock.Object,
         _fileRepoMock.Object,
-        _deliveryConfigRepoMock.Object,
+        _failureProfileRepoMock.Object,
         _uowMock.Object,
         _paramResolverMock.Object,
         _dsResolverMock.Object,
@@ -91,7 +91,23 @@ public class RetryBehaviorAndStateTransitionTests
             Customer = new Customer { CustomerCode = "CUST" },
             DataSource = new DataSource { DataSourceType = DataSourceTypes.Sql, ConnectionReference = "Default" },
             FileConfiguration = new FileConfiguration { FileFormat = FileFormats.Csv, FileNamePattern = "report.csv" },
-            DeliveryConfiguration = new DeliveryConfiguration { DeliveryType = DeliveryTypes.Email, EmailTo = "reports@example.com" }
+            DeliveryConfiguration = new DeliveryConfiguration
+            {
+                DeliveryType = DeliveryTypes.Email,
+                EmailTo = "reports@example.com",
+                SmtpConfigId = 1,
+                SmtpConfiguration = new SmtpConfiguration
+                {
+                    SmtpConfigId = 1,
+                    ProfileName = "Test SMTP",
+                    Host = "filedrop",
+                    Port = 25,
+                    FromAddress = "noreply@test.local",
+                    UseFileDrop = true,
+                    FileDropPath = Path.GetTempPath(),
+                    IsActive = true
+                }
+            }
         };
 
         _executionRepoMock.Setup(e => e.GetByIdWithFilesAsync(12, It.IsAny<CancellationToken>()))
@@ -104,18 +120,30 @@ public class RetryBehaviorAndStateTransitionTests
             .Throws(new InvalidOperationException("Source is not configured"));
         _deliveryResolverMock.Setup(d => d.Resolve(DeliveryTypes.Email))
             .Returns(failureEmailProvider.Object);
-        _deliveryConfigRepoMock.Setup(r => r.GetFailureNotificationProfilesAsync(It.IsAny<CancellationToken>()))
+        _failureProfileRepoMock.Setup(r => r.GetActiveAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new[]
             {
-                new DeliveryConfiguration
+                new JobFailureNotificationProfile
                 {
-                    DeliveryType = DeliveryTypes.Email,
+                    FailureProfileId = 1,
+                    ProfileName = "Ops Alerts",
+                    SmtpConfigId = 1,
                     EmailTo = "ops@example.com",
                     EmailCc = "lead@example.com",
-                    EmailSubjectTemplate = "Failure {ReportCode}",
-                    EmailBodyTemplate = "Execution {ExecutionId}: {ErrorMessage}",
-                    IsFailureNotification = true,
-                    IsActive = true
+                    SubjectTemplate = "Failure {ReportCode}",
+                    BodyTemplate = "Execution {ExecutionId}: {ErrorMessage}",
+                    IsActive = true,
+                    SmtpConfiguration = new SmtpConfiguration
+                    {
+                        SmtpConfigId = 1,
+                        ProfileName = "Test SMTP",
+                        Host = "filedrop",
+                        Port = 25,
+                        FromAddress = "noreply@test.local",
+                        UseFileDrop = true,
+                        FileDropPath = Path.GetTempPath(),
+                        IsActive = true
+                    }
                 }
             });
         failureEmailProvider.Setup(p => p.DeliverAsync(It.IsAny<DeliveryRequest>(), It.IsAny<CancellationToken>()))
