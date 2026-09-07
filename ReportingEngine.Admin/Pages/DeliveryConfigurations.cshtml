@@ -42,6 +42,7 @@
   <div style="margin-top:0.75rem;">
     <button onclick="createDelivery()">Create</button>
     <button class="secondary" onclick="updateDelivery()">Update</button>
+    <button class="secondary" onclick="testSelectedDelivery()">Test Selected</button>
     <button class="secondary" onclick="resetForm()">Clear</button>
     <button class="secondary" onclick="testSftpConnection()" id="btnTestSftp" style="display:none;">Test SFTP</button>
   </div>
@@ -107,7 +108,7 @@ async function load() {
   rows.innerHTML = items.map(x => {
     const secret = tryParseJson(x.secretReference);
     const target = x.deliveryType === 'EMAIL' ? 'Email: ' + escapeHtml(x.emailTo || '-') : x.deliveryType === 'AZURE_FILE_SHARE' ? escapeHtml(secret.DirectoryPath || x.destinationReference || 'Share root') : x.deliveryType === 'S3' ? escapeHtml(secret.Prefix || x.destinationReference || 'Bucket root') : escapeHtml(x.destinationReference || '-');
-    return `<tr><td><strong>${x.deliveryConfigId}</strong></td><td><strong>${escapeHtml(x.deliveryName)}</strong></td><td><span class="badge">${escapeHtml(x.deliveryType)}</span></td><td>${target}</td><td>${describeConnection(x)}</td><td>${x.isActive ? '<span style="color:var(--ok)">Active</span>' : 'Inactive'}</td><td><button class="secondary" onclick="editDelivery(${x.deliveryConfigId})">Edit</button> <button class="danger" onclick="deleteDelivery(${x.deliveryConfigId}, '${escapeHtml(x.deliveryName).replace(/'/g, "\\'")}')">Delete</button></td></tr>`;
+    return `<tr><td><strong>${x.deliveryConfigId}</strong></td><td><strong>${escapeHtml(x.deliveryName)}</strong></td><td><span class="badge">${escapeHtml(x.deliveryType)}</span></td><td>${target}</td><td>${describeConnection(x)}</td><td>${x.isActive ? '<span style="color:var(--ok)">Active</span>' : 'Inactive'}</td><td><button class="secondary" onclick="editDelivery(${x.deliveryConfigId})">Edit</button> <button class="secondary" onclick="testDelivery(${x.deliveryConfigId}, '${escapeHtml(x.deliveryType).replace(/'/g, "\\'")}')">Test</button> <button class="danger" onclick="deleteDelivery(${x.deliveryConfigId}, '${escapeHtml(x.deliveryName).replace(/'/g, "\\'")}')">Delete</button></td></tr>`;
   }).join('');
 }
 async function createDelivery() { try { await api.send('/api/deliveryconfigurations', 'POST', request(false)); showMsg(msg, 'Delivery profile created.', true); resetForm(); await load(); } catch(e) { showMsg(msg, e.message, false); } }
@@ -123,6 +124,19 @@ async function editDelivery(id) {
   toggleTypeFields(); formTitle.innerText = `Edit Delivery Profile #${x.deliveryConfigId}`; window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 async function deleteDelivery(id, label) { if (!confirm(`Delete delivery profile "${label}"?`)) return; try { await api.send('/api/deliveryconfigurations/' + id, 'DELETE'); showMsg(msg, 'Delivery profile deleted.', true); resetForm(); await load(); } catch(e) { showMsg(msg, e.message, false); } }
+async function testDelivery(id, type) {
+  let recipientEmail = null;
+  if (type === 'EMAIL') {
+    recipientEmail = prompt('Send test email with dummy attachment to:', dTo.value || '');
+    if (recipientEmail === null) return;
+  }
+  try { const res = await api.send('/api/deliveryconfigurations/' + id + '/test', 'POST', { recipientEmail }); showMsg(msg, res.message || 'Delivery test succeeded.', true); }
+  catch(e) { showMsg(msg, e.message, false); }
+}
+async function testSelectedDelivery() {
+  if (!dId.value) { showMsg(msg, 'Please select a delivery profile first.', false); return; }
+  await testDelivery(dId.value, dType.value);
+}
 function resetForm() {
   dId.value = ''; dName.value = ''; dType.value = 'EMAIL'; dActive.value = 'true'; dDest.value = ''; dSecret.value = ''; dSmtpConfigId.value = ''; dTo.value = ''; dCc.value = ''; dBcc.value = ''; dSubject.value = 'Report {ReportCode} - {ExecutionDate}'; dBody.value = '<p>Customer {CustomerCode}: {RecordCount} records generated in {FileCount} file(s).</p>';
   azConnection.value = ''; azShare.value = ''; azPath.value = ''; s3AccessKey.value = ''; s3SecretKey.value = ''; s3Region.value = 'us-east-1'; s3Bucket.value = ''; s3Prefix.value = ''; s3ServiceUrl.value = ''; s3ForcePath.value = 'false'; formTitle.innerText = 'Create / Edit Delivery Profile'; toggleTypeFields();

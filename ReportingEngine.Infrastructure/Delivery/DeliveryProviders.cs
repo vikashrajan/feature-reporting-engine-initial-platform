@@ -45,7 +45,7 @@ public sealed class EmailDeliveryProvider : IDeliveryProvider
         if (smtpConfig.UseFileDrop)
         {
             Directory.CreateDirectory(smtpConfig.FileDropPath);
-            var dropFolder = Path.Combine(smtpConfig.FileDropPath, $"{request.Tokens.ReportCode}_{DateTime.UtcNow:yyyyMMddHHmmssfff}");
+            var dropFolder = Path.Combine(smtpConfig.FileDropPath, $"{request.Tokens.ReportCode}_{DateTime.UtcNow:yyyyMMddHHmmssfff}_{Guid.NewGuid():N}");
             Directory.CreateDirectory(dropFolder);
             await File.WriteAllTextAsync(Path.Combine(dropFolder, "email.txt"),
                 $"To: {request.EmailTo}\nCc: {request.EmailCc}\nBcc: {request.EmailBcc}\nSubject: {subject}\n\n{body}",
@@ -601,9 +601,9 @@ public sealed class AzureFileShareConnectionConfig
             {
                 using var doc = System.Text.Json.JsonDocument.Parse(secretReference);
                 var root = doc.RootElement;
-                if (root.TryGetProperty("ConnectionString", out var cs)) cfg.ConnectionString = cs.GetString();
-                if (root.TryGetProperty("ShareName", out var share)) cfg.ShareName = share.GetString() ?? cfg.ShareName;
-                if (root.TryGetProperty("DirectoryPath", out var path)) cfg.DirectoryPath = path.GetString() ?? cfg.DirectoryPath;
+                if (root.TryGetProperty("ConnectionString", out var cs)) cfg.ConnectionString = cs.GetString()?.Trim();
+                if (root.TryGetProperty("ShareName", out var share)) cfg.ShareName = share.GetString()?.Trim() ?? cfg.ShareName;
+                if (root.TryGetProperty("DirectoryPath", out var path)) cfg.DirectoryPath = path.GetString()?.Trim() ?? cfg.DirectoryPath;
             }
             else if (secretReference.Contains("DefaultEndpointsProtocol=", StringComparison.OrdinalIgnoreCase))
             {

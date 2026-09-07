@@ -19,6 +19,7 @@
   <div style="margin-top:0.75rem;">
     <button onclick="createFailure()">Create</button>
     <button class="secondary" onclick="updateFailure()">Update</button>
+    <button class="secondary" onclick="testSelectedFailure()">Test Selected</button>
     <button class="secondary" onclick="resetFailure()">Clear</button>
   </div>
 </div>
@@ -46,7 +47,7 @@ function body(includeActive) {
 async function loadFailures() {
   await loadSmtpOptions();
   const items = await api.get('/api/jobfailureprofiles');
-  failureRows.innerHTML = items.map(x => `<tr><td><strong>${x.failureProfileId}</strong></td><td><strong>${escapeHtml(x.profileName)}</strong></td><td>${escapeHtml(x.smtpProfileName || '-')}</td><td>${escapeHtml(x.emailTo)}</td><td>${x.isActive ? '<span style="color:var(--ok)">Active</span>' : 'Inactive'}</td><td><button class="secondary" onclick="editFailure(${x.failureProfileId})">Edit</button> <button class="danger" onclick="deleteFailure(${x.failureProfileId}, '${escapeHtml(x.profileName).replace(/'/g, "\\'")}')">Delete</button></td></tr>`).join('');
+  failureRows.innerHTML = items.map(x => `<tr><td><strong>${x.failureProfileId}</strong></td><td><strong>${escapeHtml(x.profileName)}</strong></td><td>${escapeHtml(x.smtpProfileName || '-')}</td><td>${escapeHtml(x.emailTo)}</td><td>${x.isActive ? '<span style="color:var(--ok)">Active</span>' : 'Inactive'}</td><td><button class="secondary" onclick="editFailure(${x.failureProfileId})">Edit</button> <button class="secondary" onclick="testFailure(${x.failureProfileId})">Test</button> <button class="danger" onclick="deleteFailure(${x.failureProfileId}, '${escapeHtml(x.profileName).replace(/'/g, "\\'")}')">Delete</button></td></tr>`).join('');
 }
 async function createFailure() { try { await api.send('/api/jobfailureprofiles', 'POST', body(false)); showMsg(msg, 'Failure profile created.', true); resetFailure(); await loadFailures(); } catch(e) { showMsg(msg, e.message, false); } }
 async function updateFailure() { try { if (!fId.value) throw new Error('Please select a failure profile first.'); await api.send('/api/jobfailureprofiles/' + fId.value, 'PUT', body(true)); showMsg(msg, 'Failure profile updated.', true); resetFailure(); await loadFailures(); } catch(e) { showMsg(msg, e.message, false); } }
@@ -56,6 +57,16 @@ async function editFailure(id) {
   failureFormTitle.innerText = `Edit Failure Profile #${x.failureProfileId}`; window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 async function deleteFailure(id, label) { if (!confirm(`Delete failure profile "${label}"?`)) return; try { await api.send('/api/jobfailureprofiles/' + id, 'DELETE'); showMsg(msg, 'Failure profile deleted.', true); resetFailure(); await loadFailures(); } catch(e) { showMsg(msg, e.message, false); } }
+async function testFailure(id) {
+  const recipientEmail = prompt('Send test failure email to:', fTo.value || '');
+  if (recipientEmail === null) return;
+  try { const res = await api.send('/api/jobfailureprofiles/' + id + '/test', 'POST', { recipientEmail }); showMsg(msg, res.message || 'Failure email test succeeded.', true); }
+  catch(e) { showMsg(msg, e.message, false); }
+}
+async function testSelectedFailure() {
+  if (!fId.value) { showMsg(msg, 'Please select a failure profile first.', false); return; }
+  await testFailure(fId.value);
+}
 function resetFailure() { fId.value = ''; fName.value = ''; fSmtpConfigId.value = ''; fActive.value = 'true'; fTo.value = ''; fCc.value = ''; fBcc.value = ''; fSubject.value = 'ReportingEngine job failed: {ReportCode}'; fBody.value = '<p>Report {ReportCode} failed.</p><p>Execution: {ExecutionId}</p><p>Status: {Status}</p><p>Error: {ErrorMessage}</p>'; failureFormTitle.innerText = 'Create / Edit Failure Profile'; }
 loadFailures();
 </script>

@@ -149,3 +149,5 @@ public sealed record TestSftpRequest(
     string? DestinationReference,
     string? SecretReference);
 
+public sealed record TestProfileRequest(string? RecipientEmail);
+

@@ -1,9 +1,11 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 using ReportingEngine.Application.Abstractions.Data;
+using ReportingEngine.Application.Abstractions.Delivery;
 using ReportingEngine.Application.Abstractions.Repositories;
 using ReportingEngine.Application.DTOs;
 using ReportingEngine.Application.Services;
+using ReportingEngine.Domain.Entities;
 using ReportingEngine.Domain.Enums;
 
 namespace ReportingEngine.Admin.Controllers;
@@ -226,7 +228,21 @@ public sealed class FileConfigurationsController : ControllerBase
 public sealed class DeliveryConfigurationsController : ControllerBase
 {
     private readonly IDeliveryConfigurationService _service;
-    public DeliveryConfigurationsController(IDeliveryConfigurationService service) => _service = service;
+    private readonly IDeliveryConfigurationRepository _repository;
+    private readonly IDeliveryProviderResolver _deliveryProviderResolver;
+    private readonly ILogger<DeliveryConfigurationsController> _logger;
+
+    public DeliveryConfigurationsController(
+        IDeliveryConfigurationService service,
+        IDeliveryConfigurationRepository repository,
+        IDeliveryProviderResolver deliveryProviderResolver,
+        ILogger<DeliveryConfigurationsController> logger)
+    {
+        _service = service;
+        _repository = repository;
+        _deliveryProviderResolver = deliveryProviderResolver;
+        _logger = logger;
+    }
 
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<DeliveryConfigurationDto>>> GetAll(CancellationToken cancellationToken) =>
@@ -272,6 +288,49 @@ public sealed class DeliveryConfigurationsController : ControllerBase
             return BadRequest(new { success = false, message = "SFTP connection test failed: " + ex.Message });
         }
     }
+
+    [HttpPost("{id:long}/test")]
+    public async Task<IActionResult> TestDelivery(long id, [FromBody] TestProfileRequest? request, CancellationToken cancellationToken)
+    {
+        var profile = await _repository.GetByIdAsync(id, cancellationToken)
+            ?? throw new KeyNotFoundException($"Delivery profile {id} was not found.");
+
+        var testFile = await ProfileTestHelpers.CreateDummyFileAsync("delivery", cancellationToken);
+        try
+        {
+            var deliveryProvider = _deliveryProviderResolver.Resolve(profile.DeliveryType);
+            var emailTo = string.IsNullOrWhiteSpace(request?.RecipientEmail) ? profile.EmailTo : request.RecipientEmail;
+            await deliveryProvider.DeliverAsync(new DeliveryRequest
+            {
+                DeliveryType = profile.DeliveryType,
+                DestinationReference = profile.DestinationReference,
+                SecretReference = profile.SecretReference,
+                EmailTo = emailTo,
+                EmailCc = profile.EmailCc,
+                EmailBcc = profile.EmailBcc,
+                EmailSubjectTemplate = profile.EmailSubjectTemplate ?? "ReportingEngine delivery profile test: {ReportCode}",
+                EmailBodyTemplate = profile.EmailBodyTemplate ?? "<p>This is a delivery profile test for {ReportCode}.</p>",
+                SmtpConnection = ProfileTestHelpers.BuildSmtpConnection(profile.SmtpConfiguration),
+                AttachmentPaths = new[] { testFile },
+                Tokens = ProfileTestHelpers.TestTokens("DELIVERY_TEST")
+            }, cancellationToken);
+
+            _logger.LogInformation("Delivery profile test succeeded for DeliveryConfigId={DeliveryConfigId} Type={DeliveryType}", id, profile.DeliveryType);
+            var detail = profile.DeliveryType.Equals(DeliveryTypes.Email, StringComparison.OrdinalIgnoreCase) && profile.SmtpConfiguration?.UseFileDrop == true
+                ? $" Test email was written to file drop folder {profile.SmtpConfiguration.FileDropPath}."
+                : string.Empty;
+            return Ok(new { success = true, message = $"Delivery test succeeded for {profile.DeliveryType}. Dummy file: {Path.GetFileName(testFile)}.{detail}" });
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex, "Delivery profile test failed for DeliveryConfigId={DeliveryConfigId} Type={DeliveryType}", id, profile.DeliveryType);
+            throw;
+        }
+        finally
+        {
+            ProfileTestHelpers.TryDeleteFile(testFile);
+        }
+    }
 }
 
 [ApiController]
@@ -279,7 +338,21 @@ public sealed class DeliveryConfigurationsController : ControllerBase
 public sealed class SmtpConfigurationsController : ControllerBase
 {
     private readonly ISmtpConfigurationService _service;
-    public SmtpConfigurationsController(ISmtpConfigurationService service) => _service = service;
+    private readonly ISmtpConfigurationRepository _repository;
+    private readonly IDeliveryProviderResolver _deliveryProviderResolver;
+    private readonly ILogger<SmtpConfigurationsController> _logger;
+
+    public SmtpConfigurationsController(
+        ISmtpConfigurationService service,
+        ISmtpConfigurationRepository repository,
+        IDeliveryProviderResolver deliveryProviderResolver,
+        ILogger<SmtpConfigurationsController> logger)
+    {
+        _service = service;
+        _repository = repository;
+        _deliveryProviderResolver = deliveryProviderResolver;
+        _logger = logger;
+    }
 
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<SmtpConfigurationDto>>> GetAll(CancellationToken cancellationToken) =>
@@ -306,6 +379,38 @@ public sealed class SmtpConfigurationsController : ControllerBase
         await _service.DeleteAsync(id, User?.Identity?.Name ?? "admin", cancellationToken);
         return NoContent();
     }
+
+    [HttpPost("{id:long}/test")]
+    public async Task<IActionResult> TestSmtp(long id, [FromBody] TestProfileRequest? request, CancellationToken cancellationToken)
+    {
+        var smtp = await _repository.GetByIdAsync(id, cancellationToken)
+            ?? throw new KeyNotFoundException($"SMTP profile {id} was not found.");
+        var recipient = string.IsNullOrWhiteSpace(request?.RecipientEmail) ? smtp.FromAddress : request.RecipientEmail!;
+
+        try
+        {
+            var deliveryProvider = _deliveryProviderResolver.Resolve(DeliveryTypes.Email);
+            await deliveryProvider.DeliverAsync(new DeliveryRequest
+            {
+                DeliveryType = DeliveryTypes.Email,
+                EmailTo = recipient,
+                EmailSubjectTemplate = "ReportingEngine SMTP profile test: {ReportCode}",
+                EmailBodyTemplate = "<p>This confirms SMTP profile '{ReportCode}' can send email.</p>",
+                SmtpConnection = ProfileTestHelpers.BuildSmtpConnection(smtp),
+                AttachmentPaths = Array.Empty<string>(),
+                Tokens = ProfileTestHelpers.TestTokens(smtp.ProfileName)
+            }, cancellationToken);
+
+            _logger.LogInformation("SMTP profile test succeeded for SmtpConfigId={SmtpConfigId} Recipient={Recipient}", id, recipient);
+            var mode = smtp.UseFileDrop ? $"written to file drop folder {smtp.FileDropPath}" : $"sent to {recipient}";
+            return Ok(new { success = true, message = $"SMTP test succeeded. Test email {mode}." });
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex, "SMTP profile test failed for SmtpConfigId={SmtpConfigId} Recipient={Recipient}", id, recipient);
+            throw;
+        }
+    }
 }
 
 [ApiController]
@@ -313,7 +418,21 @@ public sealed class SmtpConfigurationsController : ControllerBase
 public sealed class JobFailureProfilesController : ControllerBase
 {
     private readonly IJobFailureNotificationProfileService _service;
-    public JobFailureProfilesController(IJobFailureNotificationProfileService service) => _service = service;
+    private readonly IJobFailureNotificationProfileRepository _repository;
+    private readonly IDeliveryProviderResolver _deliveryProviderResolver;
+    private readonly ILogger<JobFailureProfilesController> _logger;
+
+    public JobFailureProfilesController(
+        IJobFailureNotificationProfileService service,
+        IJobFailureNotificationProfileRepository repository,
+        IDeliveryProviderResolver deliveryProviderResolver,
+        ILogger<JobFailureProfilesController> logger)
+    {
+        _service = service;
+        _repository = repository;
+        _deliveryProviderResolver = deliveryProviderResolver;
+        _logger = logger;
+    }
 
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<JobFailureNotificationProfileDto>>> GetAll(CancellationToken cancellationToken) =>
@@ -339,5 +458,84 @@ public sealed class JobFailureProfilesController : ControllerBase
     {
         await _service.DeleteAsync(id, User?.Identity?.Name ?? "admin", cancellationToken);
         return NoContent();
+    }
+
+    [HttpPost("{id:long}/test")]
+    public async Task<IActionResult> TestFailureProfile(long id, [FromBody] TestProfileRequest? request, CancellationToken cancellationToken)
+    {
+        var profile = await _repository.GetByIdAsync(id, cancellationToken)
+            ?? throw new KeyNotFoundException($"Job failure notification profile {id} was not found.");
+        var recipient = string.IsNullOrWhiteSpace(request?.RecipientEmail) ? profile.EmailTo : request.RecipientEmail!;
+
+        try
+        {
+            var deliveryProvider = _deliveryProviderResolver.Resolve(DeliveryTypes.Email);
+            await deliveryProvider.DeliverAsync(new DeliveryRequest
+            {
+                DeliveryType = DeliveryTypes.Email,
+                EmailTo = recipient,
+                EmailCc = profile.EmailCc,
+                EmailBcc = profile.EmailBcc,
+                EmailSubjectTemplate = profile.SubjectTemplate ?? "ReportingEngine job failed: {ReportCode}",
+                EmailBodyTemplate = profile.BodyTemplate ?? "<p>Report {ReportCode} failed.</p><p>Execution: {ExecutionId}</p><p>Status: {Status}</p><p>Error: {ErrorMessage}</p>",
+                SmtpConnection = ProfileTestHelpers.BuildSmtpConnection(profile.SmtpConfiguration),
+                AttachmentPaths = Array.Empty<string>(),
+                Tokens = new DeliveryTokenContext("TEST", "FAILURE_TEST", DateTime.UtcNow, 0, 0, 999999, JobExecutionStatuses.Failed, "This is a test failure notification.")
+            }, cancellationToken);
+
+            _logger.LogInformation("Failure profile test succeeded for FailureProfileId={FailureProfileId} Recipient={Recipient}", id, recipient);
+            var mode = profile.SmtpConfiguration.UseFileDrop ? $"written to file drop folder {profile.SmtpConfiguration.FileDropPath}" : $"sent to {recipient}";
+            return Ok(new { success = true, message = $"Failure email test succeeded. Test email {mode}." });
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex, "Failure profile test failed for FailureProfileId={FailureProfileId} Recipient={Recipient}", id, recipient);
+            throw;
+        }
+    }
+}
+
+internal static class ProfileTestHelpers
+{
+    public static async Task<string> CreateDummyFileAsync(string prefix, CancellationToken cancellationToken)
+    {
+        var directory = Path.Combine(@"C:\ReportingEngineOutput", "profile-tests");
+        Directory.CreateDirectory(directory);
+        var path = Path.Combine(directory, $"{prefix}_{DateTime.UtcNow:yyyyMMddHHmmssfff}.txt");
+        await System.IO.File.WriteAllTextAsync(path, $"ReportingEngine test file generated at UTC {DateTime.UtcNow:O}{Environment.NewLine}", cancellationToken);
+        return path;
+    }
+
+    public static DeliveryTokenContext TestTokens(string reportCode) =>
+        new("TEST", reportCode, DateTime.UtcNow, 1, 1, 999999, "TEST", null);
+
+    public static SmtpConnectionSettings? BuildSmtpConnection(SmtpConfiguration? smtp) =>
+        smtp is null
+            ? null
+            : new SmtpConnectionSettings(
+                smtp.ProfileName,
+                smtp.Host,
+                smtp.Port,
+                smtp.EnableSsl,
+                smtp.FromAddress,
+                smtp.FromDisplayName,
+                smtp.UserName,
+                smtp.Password,
+                smtp.TimeoutSeconds,
+                smtp.UseFileDrop,
+                smtp.FileDropPath);
+
+    public static void TryDeleteFile(string path)
+    {
+        try
+        {
+            if (System.IO.File.Exists(path))
+            {
+                System.IO.File.Delete(path);
+            }
+        }
+        catch
+        {
+        }
     }
 }

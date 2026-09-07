@@ -23,6 +23,7 @@
   <div style="margin-top:0.75rem;">
     <button onclick="createSmtp()">Create</button>
     <button class="secondary" onclick="updateSmtp()">Update</button>
+    <button class="secondary" onclick="testSelectedSmtp()">Test Selected</button>
     <button class="secondary" onclick="resetSmtp()">Clear</button>
   </div>
 </div>
@@ -46,7 +47,7 @@ function body(includeActive) {
 }
 async function loadSmtp() {
   const items = await api.get('/api/smtpconfigurations');
-  smtpRows.innerHTML = items.map(x => `<tr><td><strong>${x.smtpConfigId}</strong></td><td><strong>${escapeHtml(x.profileName)}</strong></td><td>${x.useFileDrop ? 'File drop' : escapeHtml(x.host + ':' + x.port)}</td><td>${escapeHtml(x.fromAddress)}</td><td>${x.hasPassword ? 'Configured' : '-'}</td><td>${x.isActive ? '<span style="color:var(--ok)">Active</span>' : 'Inactive'}</td><td><button class="secondary" onclick="editSmtp(${x.smtpConfigId})">Edit</button> <button class="danger" onclick="deleteSmtp(${x.smtpConfigId}, '${escapeHtml(x.profileName).replace(/'/g, "\\'")}')">Delete</button></td></tr>`).join('');
+  smtpRows.innerHTML = items.map(x => `<tr><td><strong>${x.smtpConfigId}</strong></td><td><strong>${escapeHtml(x.profileName)}</strong></td><td>${x.useFileDrop ? 'File drop' : escapeHtml(x.host + ':' + x.port)}</td><td>${escapeHtml(x.fromAddress)}</td><td>${x.hasPassword ? 'Configured' : '-'}</td><td>${x.isActive ? '<span style="color:var(--ok)">Active</span>' : 'Inactive'}</td><td><button class="secondary" onclick="editSmtp(${x.smtpConfigId})">Edit</button> <button class="secondary" onclick="testSmtp(${x.smtpConfigId})">Test</button> <button class="danger" onclick="deleteSmtp(${x.smtpConfigId}, '${escapeHtml(x.profileName).replace(/'/g, "\\'")}')">Delete</button></td></tr>`).join('');
 }
 async function createSmtp() { try { await api.send('/api/smtpconfigurations', 'POST', body(false)); showMsg(msg, 'SMTP profile created.', true); resetSmtp(); await loadSmtp(); } catch(e) { showMsg(msg, e.message, false); } }
 async function updateSmtp() { try { if (!sId.value) throw new Error('Please select an SMTP profile first.'); await api.send('/api/smtpconfigurations/' + sId.value, 'PUT', body(true)); showMsg(msg, 'SMTP profile updated.', true); resetSmtp(); await loadSmtp(); } catch(e) { showMsg(msg, e.message, false); } }
@@ -56,6 +57,16 @@ async function editSmtp(id) {
   toggleDrop(); smtpFormTitle.innerText = `Edit SMTP Profile #${x.smtpConfigId}`; window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 async function deleteSmtp(id, label) { if (!confirm(`Delete SMTP profile "${label}"?`)) return; try { await api.send('/api/smtpconfigurations/' + id, 'DELETE'); showMsg(msg, 'SMTP profile deleted.', true); resetSmtp(); await loadSmtp(); } catch(e) { showMsg(msg, e.message, false); } }
+async function testSmtp(id) {
+  const recipientEmail = prompt('Send test email to:', sFrom.value || '');
+  if (recipientEmail === null) return;
+  try { const res = await api.send('/api/smtpconfigurations/' + id + '/test', 'POST', { recipientEmail }); showMsg(msg, res.message || 'SMTP test succeeded.', true); }
+  catch(e) { showMsg(msg, e.message, false); }
+}
+async function testSelectedSmtp() {
+  if (!sId.value) { showMsg(msg, 'Please select an SMTP profile first.', false); return; }
+  await testSmtp(sId.value);
+}
 function resetSmtp() { sId.value = ''; sName.value = ''; sHost.value = ''; sPort.value = '587'; sSsl.value = 'true'; sActive.value = 'true'; sFrom.value = ''; sFromName.value = ''; sUser.value = ''; sPassword.value = ''; sTimeout.value = '120'; sDrop.value = 'false'; sDropPath.value = ''; smtpFormTitle.innerText = 'Create / Edit SMTP Profile'; toggleDrop(); }
 toggleDrop();
 loadSmtp();
