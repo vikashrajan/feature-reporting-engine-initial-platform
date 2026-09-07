@@ -4,7 +4,6 @@ using ReportingEngine.Application.DTOs;
 using ReportingEngine.Application.Options;
 using ReportingEngine.Domain.Entities;
 using ReportingEngine.Domain.Enums;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace ReportingEngine.Application.Services;
@@ -15,20 +14,17 @@ public sealed class DataSourceService : IDataSourceService
     private readonly IUnitOfWork _unitOfWork;
     private readonly IAuditService _audit;
     private readonly IOptionsMonitor<ConnectionReferencesOptions> _connectionReferences;
-    private readonly ILogger<DataSourceService> _logger;
 
     public DataSourceService(
         IDataSourceRepository repository,
         IUnitOfWork unitOfWork,
         IAuditService audit,
-        IOptionsMonitor<ConnectionReferencesOptions> connectionReferences,
-        ILogger<DataSourceService> logger)
+        IOptionsMonitor<ConnectionReferencesOptions> connectionReferences)
     {
         _repository = repository;
         _unitOfWork = unitOfWork;
         _audit = audit;
         _connectionReferences = connectionReferences;
-        _logger = logger;
     }
 
     public async Task<IReadOnlyList<DataSourceDto>> GetAllAsync(CancellationToken cancellationToken = default)
@@ -51,12 +47,11 @@ public sealed class DataSourceService : IDataSourceService
             DataSourceName = request.DataSourceName.Trim(),
             DataSourceType = request.DataSourceType.Trim().ToUpperInvariant(),
             ConnectionReference = connectionReference,
+            ConnectionString = NormalizeConnectionStringOrNull(request.ConnectionString),
             IsActive = true,
             CreatedBy = performedBy,
             CreatedDate = DateTime.UtcNow
         };
-
-        PersistConnectionReference(connectionReference, request.ConnectionString);
 
         await _repository.AddAsync(entity, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
@@ -74,11 +69,13 @@ public sealed class DataSourceService : IDataSourceService
         entity.DataSourceName = request.DataSourceName.Trim();
         entity.DataSourceType = request.DataSourceType.Trim().ToUpperInvariant();
         entity.ConnectionReference = connectionReference;
+        if (request.ConnectionString is not null)
+        {
+            entity.ConnectionString = NormalizeConnectionStringOrNull(request.ConnectionString);
+        }
         entity.IsActive = request.IsActive;
         entity.ModifiedBy = performedBy;
         entity.ModifiedDate = DateTime.UtcNow;
-
-        PersistConnectionReference(connectionReference, request.ConnectionString);
 
         await _repository.UpdateAsync(entity, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
@@ -103,7 +100,14 @@ public sealed class DataSourceService : IDataSourceService
     }
 
     private DataSourceDto Map(DataSource d) =>
-        new(d.DataSourceId, d.DataSourceName, d.DataSourceType, d.ConnectionReference, HasConfiguredConnection(d.ConnectionReference), d.IsActive);
+        new(
+            d.DataSourceId,
+            d.DataSourceName,
+            d.DataSourceType,
+            d.ConnectionReference,
+            !string.IsNullOrWhiteSpace(d.ConnectionString),
+            !string.IsNullOrWhiteSpace(d.ConnectionString) || HasConfiguredConnection(d.ConnectionReference),
+            d.IsActive);
 
     private bool HasConfiguredConnection(string connectionReference)
     {
@@ -134,91 +138,11 @@ public sealed class DataSourceService : IDataSourceService
         return connectionReference.Trim();
     }
 
-    private void PersistConnectionReference(string connectionReference, string? connectionString)
-    {
-        if (string.IsNullOrWhiteSpace(connectionString))
-        {
-            return;
-        }
-
-        try
-        {
-            foreach (var filePath in GetLocalSettingsCandidatePaths())
-            {
-                Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
-
-                var json = File.Exists(filePath) ? File.ReadAllText(filePath) : "{}";
-                var node = System.Text.Json.Nodes.JsonNode.Parse(json)?.AsObject()
-                    ?? new System.Text.Json.Nodes.JsonObject();
-
-                if (node["ConnectionReferences"] is not System.Text.Json.Nodes.JsonObject refs)
-                {
-                    refs = new System.Text.Json.Nodes.JsonObject();
-                    node["ConnectionReferences"] = refs;
-                }
-
-                if (refs["Values"] is not System.Text.Json.Nodes.JsonObject values)
-                {
-                    values = new System.Text.Json.Nodes.JsonObject();
-                    refs["Values"] = values;
-                }
-
-                values[connectionReference] = NormalizeConnectionString(connectionString);
-
-                var options = new System.Text.Json.JsonSerializerOptions { WriteIndented = true };
-                File.WriteAllText(filePath, node.ToJsonString(options));
-                _logger.LogInformation("Persisted data source connection reference {ConnectionReference} to local override {FilePath}",
-                    connectionReference, filePath);
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Could not persist data source connection reference {ConnectionReference} to local override", connectionReference);
-        }
-    }
-
-    private static IReadOnlyList<string> GetLocalSettingsCandidatePaths()
-    {
-        var paths = new List<string>
-        {
-            Path.Combine(AppContext.BaseDirectory, "appsettings.Local.json"),
-            Path.Combine(Directory.GetCurrentDirectory(), "appsettings.Local.json")
-        };
-
-        foreach (var root in GetRepositoryRoots())
-        {
-            paths.Add(Path.Combine(root, "ReportingEngine.Admin", "appsettings.Local.json"));
-            paths.Add(Path.Combine(root, "ReportingEngine.Worker", "appsettings.Local.json"));
-        }
-
-        return paths
-            .Where(path => !string.IsNullOrWhiteSpace(path))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-    }
-
-    private static string NormalizeConnectionString(string connectionString) =>
-        connectionString.Trim()
-            .Replace("(localdb)\\\\", "(localdb)\\", StringComparison.OrdinalIgnoreCase)
-            .Replace("localhost\\\\", "localhost\\", StringComparison.OrdinalIgnoreCase)
-            .Replace(".\\\\", ".\\", StringComparison.OrdinalIgnoreCase);
-
-    private static IEnumerable<string> GetRepositoryRoots()
-    {
-        foreach (var start in new[] { Directory.GetCurrentDirectory(), AppContext.BaseDirectory })
-        {
-            var directory = new DirectoryInfo(start);
-            while (directory != null)
-            {
-                if (File.Exists(Path.Combine(directory.FullName, "ReportingEngine.slnx")) ||
-                    Directory.Exists(Path.Combine(directory.FullName, "ReportingEngine.Admin")))
-                {
-                    yield return directory.FullName;
-                    break;
-                }
-
-                directory = directory.Parent;
-            }
-        }
-    }
+    private static string? NormalizeConnectionStringOrNull(string? connectionString) =>
+        string.IsNullOrWhiteSpace(connectionString)
+            ? null
+            : connectionString.Trim()
+                .Replace("(localdb)\\\\", "(localdb)\\", StringComparison.OrdinalIgnoreCase)
+                .Replace("localhost\\\\", "localhost\\", StringComparison.OrdinalIgnoreCase)
+                .Replace(".\\\\", ".\\", StringComparison.OrdinalIgnoreCase);
 }

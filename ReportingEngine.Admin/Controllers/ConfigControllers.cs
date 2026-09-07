@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 using ReportingEngine.Application.Abstractions.Data;
+using ReportingEngine.Application.Abstractions.Repositories;
 using ReportingEngine.Application.DTOs;
 using ReportingEngine.Application.Services;
 using ReportingEngine.Domain.Enums;
@@ -72,11 +73,16 @@ public sealed record TimeZoneDto(string Id, string DisplayName, string UtcOffset
 public sealed class DataSourcesController : ControllerBase
 {
     private readonly IDataSourceService _service;
+    private readonly IDataSourceRepository _repository;
     private readonly IConnectionStringResolver _connectionStringResolver;
 
-    public DataSourcesController(IDataSourceService service, IConnectionStringResolver connectionStringResolver)
+    public DataSourcesController(
+        IDataSourceService service,
+        IDataSourceRepository repository,
+        IConnectionStringResolver connectionStringResolver)
     {
         _service = service;
+        _repository = repository;
         _connectionStringResolver = connectionStringResolver;
     }
 
@@ -116,9 +122,14 @@ public sealed class DataSourcesController : ControllerBase
 
         try
         {
+            var dataSource = long.TryParse(Request.Query["dataSourceId"], out var dataSourceId)
+                ? await _repository.GetByIdAsync(dataSourceId, cancellationToken)
+                : null;
             var connectionString = !string.IsNullOrWhiteSpace(request.ConnectionString)
                 ? NormalizeConnectionString(request.ConnectionString)
-                : _connectionStringResolver.Resolve(request.ConnectionReference);
+                : !string.IsNullOrWhiteSpace(dataSource?.ConnectionString)
+                    ? dataSource.ConnectionString
+                    : _connectionStringResolver.Resolve(request.ConnectionReference);
 
             await using var connection = new SqlConnection(connectionString);
             await connection.OpenAsync(cancellationToken);

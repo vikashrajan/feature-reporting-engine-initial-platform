@@ -73,7 +73,7 @@ The Reporting Engine platform uses standard .NET configuration files (`appsettin
 ### 6. Connection & Secret References (`ConnectionReferences`, `SecretReferences`)
 
 Stores mapped connection strings or key references for data sources and delivery target credentials.
-For Data Sources, `RepScdhedularProject_DataSource.ConnectionReference` stores the reference name, while the real source database connection string is saved under `ConnectionReferences:Values:<reference name>`. The Data Sources screen can write this private value to local ignored config for both Admin and Worker.
+For Data Sources, `RepScdhedularProject_DataSource.ConnectionReference` stores the reference name and `RepScdhedularProject_DataSource.ConnectionString` stores the source database connection string. The scheduler uses the DB connection string first, then falls back to `ConnectionReferences:Values:<reference name>` for older rows.
 
 ```json
 "ConnectionReferences": {

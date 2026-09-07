@@ -190,6 +190,11 @@ public static class DependencyInjection
                 BEGIN
                     ALTER TABLE RepScdhedularProject_FileConfiguration ADD KeepLocalFiles bit NOT NULL CONSTRAINT DF_RepScdhedularProject_FileConfiguration_KeepLocalFiles DEFAULT(1)
                 END
+
+                IF COL_LENGTH('RepScdhedularProject_DataSource', 'ConnectionString') IS NULL
+                BEGIN
+                    ALTER TABLE RepScdhedularProject_DataSource ADD ConnectionString nvarchar(max) NULL
+                END
                 """, cancellationToken);
         }
 

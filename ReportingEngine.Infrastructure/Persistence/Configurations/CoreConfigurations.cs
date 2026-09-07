@@ -32,6 +32,7 @@ public sealed class DataSourceConfiguration : IEntityTypeConfiguration<DataSourc
         builder.Property(x => x.DataSourceName).HasMaxLength(200).IsRequired();
         builder.Property(x => x.DataSourceType).HasMaxLength(50).IsRequired();
         builder.Property(x => x.ConnectionReference).HasMaxLength(200).IsRequired();
+        builder.Property(x => x.ConnectionString).HasColumnType("nvarchar(max)");
         builder.Property(x => x.IsActive).IsRequired().HasDefaultValue(true);
         builder.Property(x => x.CreatedBy).HasMaxLength(100).IsRequired();
         builder.Property(x => x.CreatedDate).IsRequired().HasDefaultValueSql("SYSUTCDATETIME()");

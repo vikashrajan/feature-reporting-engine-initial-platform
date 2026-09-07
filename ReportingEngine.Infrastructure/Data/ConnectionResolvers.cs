@@ -19,6 +19,11 @@ public sealed class ConnectionStringResolver : IConnectionStringResolver
             throw new InvalidOperationException("Connection reference is required.");
         }
 
+        if (LooksLikeConnectionString(connectionReference))
+        {
+            return connectionReference;
+        }
+
         var envKey = $"ConnectionReferences__{connectionReference}";
         var nestedEnvKey = $"ConnectionReferences__Values__{connectionReference}";
         var fromEnv = Environment.GetEnvironmentVariable(envKey)
@@ -36,6 +41,9 @@ public sealed class ConnectionStringResolver : IConnectionStringResolver
         throw new InvalidOperationException(
             $"Connection reference '{connectionReference}' was not found. Configure ConnectionReferences:Values:{connectionReference} or environment variable {envKey} / {nestedEnvKey}.");
     }
+
+    private static bool LooksLikeConnectionString(string value) =>
+        value.Contains('=') && value.Contains(';');
 }
 
 public sealed class SecretResolver : ISecretResolver

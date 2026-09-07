@@ -6,6 +6,7 @@ public class DataSource
     public string DataSourceName { get; set; } = string.Empty;
     public string DataSourceType { get; set; } = string.Empty;
     public string ConnectionReference { get; set; } = string.Empty;
+    public string? ConnectionString { get; set; }
     public bool IsActive { get; set; } = true;
     public string CreatedBy { get; set; } = string.Empty;
     public DateTime CreatedDate { get; set; }

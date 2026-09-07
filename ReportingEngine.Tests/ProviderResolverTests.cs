@@ -152,6 +152,18 @@ public class ProviderResolverTests
     }
 
     [Fact]
+    public void ConnectionStringResolver_ShouldAcceptRawConnectionString()
+    {
+        var options = new Mock<IOptionsMonitor<ConnectionReferencesOptions>>();
+        options.SetupGet(x => x.CurrentValue).Returns(new ConnectionReferencesOptions());
+        var resolver = new ConnectionStringResolver(options.Object);
+
+        var connectionString = resolver.Resolve("Server=(localdb)\\mssqllocaldb;Database=demo;");
+
+        connectionString.Should().Contain("Database=demo");
+    }
+
+    [Fact]
     public void EmailConnectionConfig_FromSecretReference_ShouldOverrideDefaultSmtpSettings()
     {
         var options = new EmailOptions

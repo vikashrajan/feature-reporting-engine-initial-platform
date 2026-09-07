@@ -4,7 +4,7 @@ public sealed record CustomerDto(long CustomerId, string CustomerCode, string Cu
 public sealed record CreateCustomerRequest(string CustomerCode, string CustomerName, string? TimeZoneId);
 public sealed record UpdateCustomerRequest(string CustomerName, string? TimeZoneId, bool IsActive);
 
-public sealed record DataSourceDto(long DataSourceId, string DataSourceName, string DataSourceType, string ConnectionReference, bool HasConfiguredConnection, bool IsActive);
+public sealed record DataSourceDto(long DataSourceId, string DataSourceName, string DataSourceType, string ConnectionReference, bool HasConnectionString, bool HasConfiguredConnection, bool IsActive);
 public sealed record CreateDataSourceRequest(string DataSourceName, string DataSourceType, string ConnectionReference, string? ConnectionString);
 public sealed record UpdateDataSourceRequest(string DataSourceName, string DataSourceType, string ConnectionReference, string? ConnectionString, bool IsActive);
 public sealed record TestDataSourceConnectionRequest(string DataSourceType, string ConnectionReference, string? ConnectionString);

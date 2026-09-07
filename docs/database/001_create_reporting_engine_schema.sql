@@ -34,6 +34,7 @@ CREATE TABLE dbo.RepScdhedularProject_DataSource
     DataSourceName nvarchar(200) NOT NULL,
     DataSourceType nvarchar(50) NOT NULL,
     ConnectionReference nvarchar(200) NOT NULL,
+    ConnectionString nvarchar(max) NULL,
     IsActive bit NOT NULL CONSTRAINT DF_RepScdhedularProject_DataSource_IsActive DEFAULT (1),
     CreatedBy nvarchar(100) NOT NULL,
     CreatedDate datetime2 NOT NULL CONSTRAINT DF_RepScdhedularProject_DataSource_CreatedDate DEFAULT (SYSUTCDATETIME()),

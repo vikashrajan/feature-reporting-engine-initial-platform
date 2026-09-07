@@ -134,7 +134,9 @@ public sealed class JobExecutor : IJobExecutor
 
             var dataProvider = _dataSourceProviderResolver.Resolve(report.DataSource.DataSourceType);
             var rows = await dataProvider.ExecuteQueryAsync(
-                report.DataSource.ConnectionReference,
+                string.IsNullOrWhiteSpace(report.DataSource.ConnectionString)
+                    ? report.DataSource.ConnectionReference
+                    : report.DataSource.ConnectionString,
                 report.QueryText,
                 parameters,
                 cancellationToken);
