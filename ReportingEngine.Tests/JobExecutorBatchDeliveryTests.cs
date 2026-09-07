@@ -98,6 +98,7 @@ public class JobExecutorBatchDeliveryTests : IDisposable
             reportRepo.Object,
             executionRepo.Object,
             fileRepo.Object,
+            Mock.Of<IDeliveryConfigurationRepository>(),
             Mock.Of<IUnitOfWork>(),
             parameterResolver.Object,
             dataSourceResolver.Object,
@@ -108,7 +109,6 @@ public class JobExecutorBatchDeliveryTests : IDisposable
             Mock.Of<IAuditService>(),
             Options.Create(new ExecutionOptions { TemporaryFilePath = _tempDirectory }),
             Options.Create(new RetryOptions { MaxRetryCount = 3 }),
-            Options.Create(new EmailOptions()),
             NullLogger<JobExecutor>.Instance);
 
         await sut.ExecuteByExecutionIdAsync(execution.ExecutionId);
@@ -194,6 +194,7 @@ public class JobExecutorBatchDeliveryTests : IDisposable
             reportRepo.Object,
             executionRepo.Object,
             fileRepo.Object,
+            Mock.Of<IDeliveryConfigurationRepository>(),
             Mock.Of<IUnitOfWork>(),
             parameterResolver.Object,
             dataSourceResolver.Object,
@@ -204,7 +205,6 @@ public class JobExecutorBatchDeliveryTests : IDisposable
             Mock.Of<IAuditService>(),
             Options.Create(new ExecutionOptions { TemporaryFilePath = _tempDirectory }),
             Options.Create(new RetryOptions { MaxRetryCount = 3 }),
-            Options.Create(new EmailOptions()),
             NullLogger<JobExecutor>.Instance);
 
         await sut.ExecuteByExecutionIdAsync(execution.ExecutionId);

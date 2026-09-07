@@ -46,6 +46,7 @@ public sealed class DeliveryConfigurationService : IDeliveryConfigurationService
             EmailSubjectTemplate = request.EmailSubjectTemplate,
             EmailBodyTemplate = request.EmailBodyTemplate,
             SecretReference = request.SecretReference,
+            IsFailureNotification = request.IsFailureNotification,
             IsActive = true,
             CreatedBy = performedBy,
             CreatedDate = DateTime.UtcNow
@@ -74,6 +75,7 @@ public sealed class DeliveryConfigurationService : IDeliveryConfigurationService
         entity.EmailSubjectTemplate = request.EmailSubjectTemplate;
         entity.EmailBodyTemplate = request.EmailBodyTemplate;
         entity.SecretReference = request.SecretReference;
+        entity.IsFailureNotification = request.IsFailureNotification;
         entity.IsActive = request.IsActive;
         entity.ModifiedBy = performedBy;
         entity.ModifiedDate = DateTime.UtcNow;
@@ -114,6 +116,11 @@ public sealed class DeliveryConfigurationService : IDeliveryConfigurationService
             throw new InvalidOperationException("EmailTo is required for EMAIL delivery.");
         }
 
+        if (type == DeliveryTypes.Email && string.IsNullOrWhiteSpace(secretReference))
+        {
+            throw new InvalidOperationException("SMTP connection settings are required for EMAIL delivery.");
+        }
+
         if (type is DeliveryTypes.SharedFolder or DeliveryTypes.Sftp or DeliveryTypes.Ftp or DeliveryTypes.Blob
             && string.IsNullOrWhiteSpace(destinationReference))
         {
@@ -132,5 +139,5 @@ public sealed class DeliveryConfigurationService : IDeliveryConfigurationService
     }
 
     private static DeliveryConfigurationDto Map(DeliveryConfiguration d) =>
-        new(d.DeliveryConfigId, d.DeliveryName, d.DeliveryType, d.DestinationReference, d.EmailTo, d.EmailCc, d.EmailBcc, d.EmailSubjectTemplate, d.EmailBodyTemplate, d.SecretReference, d.IsActive);
+        new(d.DeliveryConfigId, d.DeliveryName, d.DeliveryType, d.DestinationReference, d.EmailTo, d.EmailCc, d.EmailBcc, d.EmailSubjectTemplate, d.EmailBodyTemplate, d.SecretReference, d.IsFailureNotification, d.IsActive);
 }

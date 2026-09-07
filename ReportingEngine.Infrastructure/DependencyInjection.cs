@@ -195,6 +195,11 @@ public static class DependencyInjection
                 BEGIN
                     ALTER TABLE RepScdhedularProject_DataSource ADD ConnectionString nvarchar(max) NULL
                 END
+
+                IF COL_LENGTH('RepScdhedularProject_DeliveryConfiguration', 'IsFailureNotification') IS NULL
+                BEGIN
+                    ALTER TABLE RepScdhedularProject_DeliveryConfiguration ADD IsFailureNotification bit NOT NULL CONSTRAINT DF_RepScdhedularProject_DeliveryConfiguration_IsFailureNotification DEFAULT(0)
+                END
                 """, cancellationToken);
         }
 

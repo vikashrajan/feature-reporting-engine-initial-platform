@@ -38,6 +38,7 @@ public sealed class EmailDeliveryProvider : IDeliveryProvider
         var subject = ReplaceTokens(request.EmailSubjectTemplate ?? "Report {ReportCode}", request.Tokens);
         var body = ReplaceTokens(request.EmailBodyTemplate ?? "<p>Report {ReportCode} generated with {RecordCount} records in {FileCount} file(s).</p>", request.Tokens);
         var smtpConfig = EmailConnectionConfig.From(_options, request.SecretReference);
+        smtpConfig.Validate();
 
         if (smtpConfig.UseFileDrop)
         {
@@ -141,6 +142,36 @@ public sealed class EmailConnectionConfig
     public int TimeoutSeconds { get; set; } = 120;
     public bool UseFileDrop { get; set; }
     public string FileDropPath { get; set; } = "./temp-emails";
+
+    public void Validate()
+    {
+        if (UseFileDrop)
+        {
+            if (string.IsNullOrWhiteSpace(FileDropPath))
+            {
+                throw new InvalidOperationException("Email file-drop path is required when Local Debug Drop Mode is enabled.");
+            }
+
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(Host) ||
+            string.Equals(Host, "localhost", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(Host, "filedrop", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("Live SMTP host is required. Disable Local Debug Drop Mode only after configuring a real SMTP host.");
+        }
+
+        if (Port <= 0)
+        {
+            throw new InvalidOperationException("SMTP port must be greater than zero.");
+        }
+
+        if (string.IsNullOrWhiteSpace(FromAddress))
+        {
+            throw new InvalidOperationException("SMTP From Sender Email is required.");
+        }
+    }
 
     public static EmailConnectionConfig From(EmailOptions options, string? secretReference)
     {

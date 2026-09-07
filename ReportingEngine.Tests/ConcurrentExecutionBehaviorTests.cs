@@ -97,6 +97,7 @@ public class ConcurrentExecutionBehaviorTests : IDisposable
             reportRepoMock.Object,
             executionRepoMock.Object,
             fileRepoMock.Object,
+            Mock.Of<IDeliveryConfigurationRepository>(),
             uowMock.Object,
             paramResolverMock.Object,
             dsResolverMock.Object,
@@ -107,7 +108,6 @@ public class ConcurrentExecutionBehaviorTests : IDisposable
             auditMock.Object,
             execOptions,
             retryOptions,
-            Options.Create(new EmailOptions()),
             logger);
 
         // Act: Execute Report 1 and Report 2 concurrently

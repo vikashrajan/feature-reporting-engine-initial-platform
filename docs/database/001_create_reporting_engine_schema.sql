@@ -96,6 +96,7 @@ CREATE TABLE dbo.RepScdhedularProject_DeliveryConfiguration
     EmailSubjectTemplate nvarchar(1000) NULL,
     EmailBodyTemplate nvarchar(max) NULL,
     SecretReference nvarchar(500) NULL,
+    IsFailureNotification bit NOT NULL CONSTRAINT DF_RepScdhedularProject_DeliveryConfiguration_IsFailureNotification DEFAULT (0),
     IsActive bit NOT NULL CONSTRAINT DF_RepScdhedularProject_DeliveryConfiguration_IsActive DEFAULT (1),
     CreatedBy nvarchar(100) NOT NULL,
     CreatedDate datetime2 NOT NULL CONSTRAINT DF_RepScdhedularProject_DeliveryConfiguration_CreatedDate DEFAULT (SYSUTCDATETIME()),

@@ -97,6 +97,7 @@ public sealed class DeliveryConfigurationConfiguration : IEntityTypeConfiguratio
         builder.Property(x => x.EmailSubjectTemplate).HasMaxLength(1000);
         builder.Property(x => x.EmailBodyTemplate).HasColumnType("nvarchar(max)");
         builder.Property(x => x.SecretReference).HasMaxLength(500);
+        builder.Property(x => x.IsFailureNotification).IsRequired().HasDefaultValue(false);
         builder.Property(x => x.IsActive).IsRequired().HasDefaultValue(true);
         builder.Property(x => x.CreatedBy).HasMaxLength(100).IsRequired();
         builder.Property(x => x.CreatedDate).IsRequired().HasDefaultValueSql("SYSUTCDATETIME()");

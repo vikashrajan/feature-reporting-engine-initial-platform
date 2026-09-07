@@ -68,6 +68,7 @@ public static class DatabaseSeeder
             EmailTo = "reports@example.com",
             EmailSubjectTemplate = "Report {ReportCode} - {ExecutionDate}",
             EmailBodyTemplate = "<p>Customer {CustomerCode}: {RecordCount} records in {FileCount} file(s).</p>",
+            SecretReference = """{"Host":"filedrop","Port":25,"UseFileDrop":true,"FileDropPath":"./temp-emails"}""",
             IsActive = true,
             CreatedBy = "seed",
             CreatedDate = DateTime.UtcNow

@@ -16,6 +16,7 @@ public sealed class JobExecutor : IJobExecutor
     private readonly IReportRepository _reportRepository;
     private readonly IJobExecutionRepository _executionRepository;
     private readonly IFileExecutionRepository _fileExecutionRepository;
+    private readonly IDeliveryConfigurationRepository _deliveryConfigurationRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IParameterResolver _parameterResolver;
     private readonly IDataSourceProviderResolver _dataSourceProviderResolver;
@@ -26,13 +27,13 @@ public sealed class JobExecutor : IJobExecutor
     private readonly IAuditService _auditService;
     private readonly ExecutionOptions _executionOptions;
     private readonly RetryOptions _retryOptions;
-    private readonly EmailOptions _emailOptions;
     private readonly ILogger<JobExecutor> _logger;
 
     public JobExecutor(
         IReportRepository reportRepository,
         IJobExecutionRepository executionRepository,
         IFileExecutionRepository fileExecutionRepository,
+        IDeliveryConfigurationRepository deliveryConfigurationRepository,
         IUnitOfWork unitOfWork,
         IParameterResolver parameterResolver,
         IDataSourceProviderResolver dataSourceProviderResolver,
@@ -43,12 +44,12 @@ public sealed class JobExecutor : IJobExecutor
         IAuditService auditService,
         IOptions<ExecutionOptions> executionOptions,
         IOptions<RetryOptions> retryOptions,
-        IOptions<EmailOptions> emailOptions,
         ILogger<JobExecutor> logger)
     {
         _reportRepository = reportRepository;
         _executionRepository = executionRepository;
         _fileExecutionRepository = fileExecutionRepository;
+        _deliveryConfigurationRepository = deliveryConfigurationRepository;
         _unitOfWork = unitOfWork;
         _parameterResolver = parameterResolver;
         _dataSourceProviderResolver = dataSourceProviderResolver;
@@ -59,7 +60,6 @@ public sealed class JobExecutor : IJobExecutor
         _auditService = auditService;
         _executionOptions = executionOptions.Value;
         _retryOptions = retryOptions.Value;
-        _emailOptions = emailOptions.Value;
         _logger = logger;
     }
 
@@ -334,8 +334,11 @@ public sealed class JobExecutor : IJobExecutor
 
     private async Task SendFailureNotificationAsync(JobExecution execution, Exception error, CancellationToken cancellationToken)
     {
-        if (!_emailOptions.FailureNotificationEnabled || string.IsNullOrWhiteSpace(_emailOptions.FailureNotificationTo))
+        var profiles = await _deliveryConfigurationRepository.GetFailureNotificationProfilesAsync(cancellationToken)
+            ?? Array.Empty<DeliveryConfiguration>();
+        if (profiles.Count == 0)
         {
+            _logger.LogWarning("No active failure notification EMAIL delivery configurations were found for execution {ExecutionId}", execution.ExecutionId);
             return;
         }
 
@@ -352,24 +355,29 @@ public sealed class JobExecutor : IJobExecutor
         try
         {
             var deliveryProvider = _deliveryProviderResolver.Resolve(DeliveryTypes.Email);
-            await deliveryProvider.DeliverAsync(new DeliveryRequest
+            foreach (var profile in profiles)
             {
-                DeliveryType = DeliveryTypes.Email,
-                EmailTo = _emailOptions.FailureNotificationTo,
-                EmailCc = _emailOptions.FailureNotificationCc,
-                EmailSubjectTemplate = _emailOptions.FailureNotificationSubjectTemplate,
-                EmailBodyTemplate = _emailOptions.FailureNotificationBodyTemplate,
-                AttachmentPaths = Array.Empty<string>(),
-                Tokens = new DeliveryTokenContext(
-                    report?.Customer?.CustomerCode ?? string.Empty,
-                    report?.ReportCode ?? execution.ReportId.ToString(),
-                    DateTime.UtcNow,
-                    execution.RecordCount ?? 0,
-                    execution.FileCount ?? 0,
-                    execution.ExecutionId,
-                    execution.Status,
-                    error.Message)
-            }, cancellationToken);
+                await deliveryProvider.DeliverAsync(new DeliveryRequest
+                {
+                    DeliveryType = DeliveryTypes.Email,
+                    SecretReference = profile.SecretReference,
+                    EmailTo = profile.EmailTo,
+                    EmailCc = profile.EmailCc,
+                    EmailBcc = profile.EmailBcc,
+                    EmailSubjectTemplate = profile.EmailSubjectTemplate ?? "ReportingEngine job failed: {ReportCode}",
+                    EmailBodyTemplate = profile.EmailBodyTemplate ?? "<p>Report {ReportCode} failed.</p><p>Execution: {ExecutionId}</p><p>Status: {Status}</p><p>Error: {ErrorMessage}</p>",
+                    AttachmentPaths = Array.Empty<string>(),
+                    Tokens = new DeliveryTokenContext(
+                        report?.Customer?.CustomerCode ?? string.Empty,
+                        report?.ReportCode ?? execution.ReportId.ToString(),
+                        DateTime.UtcNow,
+                        execution.RecordCount ?? 0,
+                        execution.FileCount ?? 0,
+                        execution.ExecutionId,
+                        execution.Status,
+                        error.Message)
+                }, cancellationToken);
+            }
         }
         catch (Exception notificationError) when (notificationError is not OperationCanceledException)
         {

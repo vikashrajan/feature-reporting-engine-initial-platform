@@ -12,6 +12,7 @@ public class DeliveryConfiguration
     public string? EmailSubjectTemplate { get; set; }
     public string? EmailBodyTemplate { get; set; }
     public string? SecretReference { get; set; }
+    public bool IsFailureNotification { get; set; }
     public bool IsActive { get; set; } = true;
     public string CreatedBy { get; set; } = string.Empty;
     public DateTime CreatedDate { get; set; }

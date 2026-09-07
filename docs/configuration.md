@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Reporting Engine platform uses standard .NET configuration files (`appsettings.json`, ignored `appsettings.Local.json` overrides, and environment variables).
+The Reporting Engine platform uses standard .NET configuration files for the primary application database connection. Frontend-managed operational settings such as Data Sources, Schedules, File Configurations, Delivery Configurations, SMTP profiles, and failure notification email profiles are stored in the ReportingEngine database.
 
 ---
 
@@ -67,8 +67,8 @@ The Reporting Engine platform uses standard .NET configuration files (`appsettin
   "FileDropPath": "C:\\Temp\\EmailDrop"
 }
 ```
-- `UseFileDrop`: Set to `true` during local development/testing to write emails as files instead of sending via SMTP.
-- Save private SMTP credentials in `ReportingEngine.Admin/appsettings.Local.json` and `ReportingEngine.Worker/appsettings.Local.json`, or use the Delivery Configurations screen. These local files are intentionally ignored by Git.
+- `Email` in appsettings is only a fallback/default. Configure live SMTP profiles from the Delivery Configurations screen so they are stored in `RepScdhedularProject_DeliveryConfiguration`.
+- Mark one or more EMAIL delivery rows as failure-notification profiles to send job failure emails from database-backed configuration.
 
 ### 6. Connection & Secret References (`ConnectionReferences`, `SecretReferences`)
 

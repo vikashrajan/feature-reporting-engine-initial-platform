@@ -159,6 +159,12 @@ public sealed class DeliveryConfigurationRepository : IDeliveryConfigurationRepo
     public Task<DeliveryConfiguration?> GetByIdAsync(long id, CancellationToken cancellationToken = default) =>
         _db.DeliveryConfigurations.FirstOrDefaultAsync(x => x.DeliveryConfigId == id, cancellationToken);
 
+    public async Task<IReadOnlyList<DeliveryConfiguration>> GetFailureNotificationProfilesAsync(CancellationToken cancellationToken = default) =>
+        await _db.DeliveryConfigurations.AsNoTracking()
+            .Where(x => x.IsActive && x.IsFailureNotification && x.DeliveryType == DeliveryTypes.Email)
+            .OrderBy(x => x.DeliveryName)
+            .ToListAsync(cancellationToken);
+
     public Task<bool> IsReferencedAsync(long id, CancellationToken cancellationToken = default) =>
         _db.Reports.AnyAsync(x => x.DeliveryConfigId == id, cancellationToken);
 

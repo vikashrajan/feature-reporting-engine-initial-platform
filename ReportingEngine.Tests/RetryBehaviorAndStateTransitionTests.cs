@@ -20,6 +20,7 @@ public class RetryBehaviorAndStateTransitionTests
     private readonly Mock<IReportRepository> _reportRepoMock = new();
     private readonly Mock<IJobExecutionRepository> _executionRepoMock = new();
     private readonly Mock<IFileExecutionRepository> _fileRepoMock = new();
+    private readonly Mock<IDeliveryConfigurationRepository> _deliveryConfigRepoMock = new();
     private readonly Mock<IUnitOfWork> _uowMock = new();
     private readonly Mock<IParameterResolver> _paramResolverMock = new();
     private readonly Mock<IDataSourceProviderResolver> _dsResolverMock = new();
@@ -32,10 +33,11 @@ public class RetryBehaviorAndStateTransitionTests
     private readonly IOptions<RetryOptions> _retryOptions = Options.Create(new RetryOptions { MaxRetryCount = 3, InitialDelaySeconds = 1 });
     private readonly ILogger<JobExecutor> _logger = new Mock<ILogger<JobExecutor>>().Object;
 
-    private JobExecutor CreateSut(EmailOptions? emailOptions = null) => new(
+    private JobExecutor CreateSut() => new(
         _reportRepoMock.Object,
         _executionRepoMock.Object,
         _fileRepoMock.Object,
+        _deliveryConfigRepoMock.Object,
         _uowMock.Object,
         _paramResolverMock.Object,
         _dsResolverMock.Object,
@@ -46,7 +48,6 @@ public class RetryBehaviorAndStateTransitionTests
         _auditMock.Object,
         _execOptions,
         _retryOptions,
-        Options.Create(emailOptions ?? new EmailOptions()),
         _logger);
 
     [Fact]
@@ -77,15 +78,7 @@ public class RetryBehaviorAndStateTransitionTests
     public async Task ExecuteByExecutionIdAsync_WhenJobFailsAndFailureEmailIsEnabled_ShouldSendNotificationEmail()
     {
         // Arrange
-        var emailOptions = new EmailOptions
-        {
-            FailureNotificationEnabled = true,
-            FailureNotificationTo = "ops@example.com",
-            FailureNotificationCc = "lead@example.com",
-            FailureNotificationSubjectTemplate = "Failure {ReportCode}",
-            FailureNotificationBodyTemplate = "Execution {ExecutionId}: {ErrorMessage}"
-        };
-        var sut = CreateSut(emailOptions);
+        var sut = CreateSut();
         var execution = new JobExecution { ExecutionId = 12, ReportId = 1, Status = JobExecutionStatuses.Created, RetryCount = 0 };
         var failureEmailProvider = new Mock<IDeliveryProvider>();
         DeliveryRequest? notificationRequest = null;
@@ -111,6 +104,20 @@ public class RetryBehaviorAndStateTransitionTests
             .Throws(new InvalidOperationException("Source is not configured"));
         _deliveryResolverMock.Setup(d => d.Resolve(DeliveryTypes.Email))
             .Returns(failureEmailProvider.Object);
+        _deliveryConfigRepoMock.Setup(r => r.GetFailureNotificationProfilesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new[]
+            {
+                new DeliveryConfiguration
+                {
+                    DeliveryType = DeliveryTypes.Email,
+                    EmailTo = "ops@example.com",
+                    EmailCc = "lead@example.com",
+                    EmailSubjectTemplate = "Failure {ReportCode}",
+                    EmailBodyTemplate = "Execution {ExecutionId}: {ErrorMessage}",
+                    IsFailureNotification = true,
+                    IsActive = true
+                }
+            });
         failureEmailProvider.Setup(p => p.DeliverAsync(It.IsAny<DeliveryRequest>(), It.IsAny<CancellationToken>()))
             .Callback<DeliveryRequest, CancellationToken>((request, _) => notificationRequest = request)
             .Returns(Task.CompletedTask);

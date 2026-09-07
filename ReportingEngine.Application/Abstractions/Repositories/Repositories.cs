@@ -47,6 +47,7 @@ public interface IDeliveryConfigurationRepository
 {
     Task<IReadOnlyList<DeliveryConfiguration>> GetAllAsync(CancellationToken cancellationToken = default);
     Task<DeliveryConfiguration?> GetByIdAsync(long id, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<DeliveryConfiguration>> GetFailureNotificationProfilesAsync(CancellationToken cancellationToken = default);
     Task<bool> IsReferencedAsync(long id, CancellationToken cancellationToken = default);
     Task<DeliveryConfiguration> AddAsync(DeliveryConfiguration entity, CancellationToken cancellationToken = default);
     Task UpdateAsync(DeliveryConfiguration entity, CancellationToken cancellationToken = default);

@@ -14,33 +14,7 @@
 </style>
 
 <div class="panel">
-  <h3>Default SMTP Email Connection Settings</h3>
-  <div class="grid-2">
-    <div><label>SMTP Host</label><input id="smtpHost" placeholder="e.g. smtp.gmail.com" /></div>
-    <div><label>SMTP Port</label><input id="smtpPort" type="number" placeholder="587" /></div>
-    <div><label>Enable SSL / TLS</label><select id="smtpSsl"><option value="false">false</option><option value="true">true</option></select></div>
-    <div><label>From Sender Email</label><input id="smtpFromAddr" placeholder="noreply@company.com" /></div>
-    <div><label>From Display Name</label><input id="smtpFromName" placeholder="Reporting System" /></div>
-    <div><label>SMTP Username</label><input id="smtpUser" placeholder="Username (optional)" /></div>
-    <div><label>SMTP Password</label><input id="smtpPass" type="password" placeholder="Password (optional)" /></div>
-    <div><label>SMTP Timeout Seconds</label><input id="smtpTimeout" type="number" min="1" value="120" /></div>
-    <div><label>Local Debug Drop Mode</label><select id="smtpDrop"><option value="true">true (Save email files locally to disk)</option><option value="false">false (Send via live SMTP server)</option></select></div>
-    <div><label>File Drop Directory</label><input id="smtpDropPath" placeholder="./temp-emails" /></div>
-    <div style="grid-column:1/-1;"><h4>Job Failure Email Notification</h4></div>
-    <div><label>Failure Email Enabled</label><select id="failMailEnabled"><option value="false">false</option><option value="true">true</option></select></div>
-    <div><label>Failure Email To</label><input id="failMailTo" placeholder="ops@example.com" /></div>
-    <div><label>Failure Email CC</label><input id="failMailCc" placeholder="optional" /></div>
-    <div><label>Failure Email Subject</label><input id="failMailSubject" value="ReportingEngine job failed: {ReportCode}" /></div>
-    <div><label>Failure Email Body</label><input id="failMailBody" value="<p>Report {ReportCode} failed.</p><p>Execution: {ExecutionId}</p><p>Error: {ErrorMessage}</p>" /></div>
-  </div>
-  <div style="margin-top:0.75rem;">
-    <button onclick="saveSmtpSettings()">Save Default SMTP</button>
-    <button class="secondary" onclick="sendTestEmail()">Send Test Email</button>
-  </div>
-</div>
-
-<div class="panel">
-  <h3 id="deliveryFormTitle">Create / Edit Delivery Target</h3>
+  <h3 id="deliveryFormTitle">Create / Edit Delivery Target or SMTP Profile</h3>
   <div class="grid-2">
     <div><label>Delivery ID (auto for Edit)</label><input id="dId" readonly style="background:#f3f4f6;" /></div>
     <div><label>Delivery Profile Name</label><input id="dName" placeholder="e.g. Gmail Reports or Azure File Share" /></div>
@@ -65,6 +39,7 @@
     <div id="emailBccGroup"><label>BCC Email(s)</label><input id="dBcc" placeholder="optional" /></div>
     <div id="emailSubjectGroup"><label>Email Subject Template</label><input id="dSubject" value="Report {ReportCode} - {ExecutionDate}" /></div>
     <div id="emailBodyGroup"><label>Email Body Template (HTML)</label><input id="dBody" value="<p>Customer {CustomerCode}: {RecordCount} records generated in {FileCount} file(s).</p>" /></div>
+    <div id="failProfileGroup"><label>Use For Job Failure Notifications</label><select id="dFailureProfile"><option value="false">false</option><option value="true">true</option></select></div>
 
     <div class="emailSmtpField"><label>Profile SMTP Host</label><input id="dSmtpHost" placeholder="smtp.gmail.com" /></div>
     <div class="emailSmtpField"><label>Profile SMTP Port</label><input id="dSmtpPort" type="number" placeholder="587" /></div>
@@ -107,6 +82,7 @@
         <th>Type</th>
         <th>Target</th>
         <th>Connection</th>
+        <th>Failure Email</th>
         <th>Status</th>
         <th>Actions</th>
       </tr>
@@ -186,60 +162,9 @@ function deliveryRequest(includeActive) {
     request.destinationReference = s3Prefix.value || null;
     request.secretReference = buildS3Secret();
   }
+  request.isFailureNotification = isEmail && dFailureProfile.value === 'true';
   if (includeActive) request.isActive = dActive.value === 'true';
   return request;
-}
-
-async function loadSmtpSettings() {
-  try {
-    const s = await api.get('/api/email/settings');
-    smtpHost.value = s.host || '';
-    smtpPort.value = s.port || 25;
-    smtpSsl.value = s.enableSsl ? 'true' : 'false';
-    smtpFromAddr.value = s.fromAddress || '';
-    smtpFromName.value = s.fromDisplayName || '';
-    smtpUser.value = s.userName || '';
-    smtpTimeout.value = s.smtpTimeoutSeconds || 120;
-    smtpDrop.value = s.useFileDrop ? 'true' : 'false';
-    smtpDropPath.value = s.fileDropPath || './temp-emails';
-    failMailEnabled.value = s.failureNotificationEnabled ? 'true' : 'false';
-    failMailTo.value = s.failureNotificationTo || '';
-    failMailCc.value = s.failureNotificationCc || '';
-    failMailSubject.value = s.failureNotificationSubjectTemplate || 'ReportingEngine job failed: {ReportCode}';
-    failMailBody.value = s.failureNotificationBodyTemplate || '<p>Report {ReportCode} failed.</p><p>Execution: {ExecutionId}</p><p>Error: {ErrorMessage}</p>';
-  } catch(e) { console.error("Error loading SMTP settings", e); }
-}
-
-async function saveSmtpSettings() {
-  try {
-    await api.send('/api/email/settings', 'PUT', {
-      host: smtpHost.value,
-      port: Number(smtpPort.value),
-      enableSsl: smtpSsl.value === 'true',
-      fromAddress: smtpFromAddr.value,
-      fromDisplayName: smtpFromName.value,
-      userName: smtpUser.value || null,
-      password: smtpPass.value || null,
-      smtpTimeoutSeconds: Number(smtpTimeout.value) || 120,
-      useFileDrop: smtpDrop.value === 'true',
-      fileDropPath: smtpDropPath.value,
-      failureNotificationEnabled: failMailEnabled.value === 'true',
-      failureNotificationTo: failMailTo.value || null,
-      failureNotificationCc: failMailCc.value || null,
-      failureNotificationSubjectTemplate: failMailSubject.value || null,
-      failureNotificationBodyTemplate: failMailBody.value || null
-    });
-    showMsg(msg, 'Default SMTP settings saved successfully!', true);
-  } catch(e) { showMsg(msg, 'Failed to save SMTP settings: ' + e.message, false); }
-}
-
-async function sendTestEmail() {
-  const recipient = prompt("Enter recipient email address for test email:", smtpFromAddr.value || "reports@example.com");
-  if (!recipient) return;
-  try {
-    const res = await api.send('/api/email/test', 'POST', { recipientEmail: recipient });
-    showMsg(msg, res.message || 'Test email dispatched successfully!', true);
-  } catch(e) { showMsg(msg, 'Test email failed: ' + e.message, false); }
 }
 
 function toggleTypeFields() {
@@ -249,7 +174,7 @@ function toggleTypeFields() {
   const isAzure = type === 'AZURE_FILE_SHARE';
   const isS3 = type === 'S3';
 
-  [emailToGroup, emailCcGroup, emailBccGroup, emailSubjectGroup, emailBodyGroup].forEach(x => x.style.display = isEmail ? 'block' : 'none');
+  [emailToGroup, emailCcGroup, emailBccGroup, emailSubjectGroup, emailBodyGroup, failProfileGroup].forEach(x => x.style.display = isEmail ? 'block' : 'none');
   document.querySelectorAll('.emailSmtpField').forEach(x => x.style.display = isEmail ? 'block' : 'none');
   document.querySelectorAll('.azureField').forEach(x => x.style.display = isAzure ? 'block' : 'none');
   document.querySelectorAll('.s3Field').forEach(x => x.style.display = isS3 ? 'block' : 'none');
@@ -282,7 +207,6 @@ function describeConnection(x) {
 }
 
 async function load() {
-  await loadSmtpSettings();
   const items = await api.get('/api/deliveryconfigurations');
   rows.innerHTML = items.map(x => {
     const secret = tryParseJson(x.secretReference);
@@ -300,6 +224,7 @@ async function load() {
       <td><span class="badge ${escapeHtml(x.deliveryType.toLowerCase())}">${escapeHtml(x.deliveryType)}</span></td>
       <td>${target}</td>
       <td>${describeConnection(x)}</td>
+      <td>${x.isFailureNotification ? 'Yes' : 'No'}</td>
       <td>${x.isActive ? '<span style="color:var(--ok)">Active</span>' : 'Inactive'}</td>
       <td>
         <button class="secondary" onclick="editDelivery(${x.deliveryConfigId})">Edit</button>
@@ -342,6 +267,7 @@ async function editDelivery(id) {
   dBcc.value = x.emailBcc || '';
   dSubject.value = x.emailSubjectTemplate || 'Report {ReportCode} - {ExecutionDate}';
   dBody.value = x.emailBodyTemplate || '<p>Customer {CustomerCode}: {RecordCount} records generated in {FileCount} file(s).</p>';
+  dFailureProfile.value = x.isFailureNotification ? 'true' : 'false';
 
   const secret = tryParseJson(x.secretReference);
   dSmtpHost.value = secret.Host || '';
@@ -396,6 +322,7 @@ function resetDeliveryForm() {
   dBcc.value = '';
   dSubject.value = 'Report {ReportCode} - {ExecutionDate}';
   dBody.value = '<p>Customer {CustomerCode}: {RecordCount} records generated in {FileCount} file(s).</p>';
+  dFailureProfile.value = 'false';
   dSmtpHost.value = '';
   dSmtpPort.value = '';
   dSmtpSsl.value = '';
