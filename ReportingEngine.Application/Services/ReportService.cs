@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using ReportingEngine.Application.Abstractions.Execution;
 using ReportingEngine.Application.Abstractions.Repositories;
 using ReportingEngine.Application.DTOs;
@@ -15,6 +16,7 @@ public sealed class ReportService : IReportService
     private readonly IReportValidator _validator;
     private readonly IScheduleSyncService _scheduleSync;
     private readonly IReportJobDispatcher _jobDispatcher;
+    private readonly ILogger<ReportService> _logger;
 
     public ReportService(
         IReportRepository reportRepository,
@@ -23,7 +25,8 @@ public sealed class ReportService : IReportService
         IAuditService audit,
         IReportValidator validator,
         IScheduleSyncService scheduleSync,
-        IReportJobDispatcher jobDispatcher)
+        IReportJobDispatcher jobDispatcher,
+        ILogger<ReportService> logger)
     {
         _reportRepository = reportRepository;
         _executionRepository = executionRepository;
@@ -32,6 +35,7 @@ public sealed class ReportService : IReportService
         _validator = validator;
         _scheduleSync = scheduleSync;
         _jobDispatcher = jobDispatcher;
+        _logger = logger;
     }
 
     public async Task<IReadOnlyList<ReportDto>> GetAllAsync(CancellationToken cancellationToken = default)
@@ -197,8 +201,17 @@ public sealed class ReportService : IReportService
         _ = await _reportRepository.GetByIdAsync(id, cancellationToken)
             ?? throw new KeyNotFoundException($"Report {id} was not found.");
 
-        await _audit.WriteAsync(nameof(ReportDefinition), id, AuditActions.ManualRun, performedBy, cancellationToken: cancellationToken);
+        try
+        {
+            await _audit.WriteAsync(nameof(ReportDefinition), id, AuditActions.ManualRun, performedBy, cancellationToken: CancellationToken.None);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "Manual run audit failed for ReportId={ReportId}; continuing to enqueue job.", id);
+        }
+
         _jobDispatcher.EnqueueReportExecution(id, null, true);
+        _logger.LogInformation("Manual report run queued. ReportId={ReportId} PerformedBy={PerformedBy}", id, performedBy);
     }
 
     public async Task<IReadOnlyList<JobExecutionDto>> GetExecutionsAsync(long reportId, CancellationToken cancellationToken = default)

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Microsoft.Extensions.Logging;
 using ReportingEngine.Application.Abstractions.Execution;
 using ReportingEngine.Application.Abstractions.Repositories;
 using ReportingEngine.Domain.Entities;
@@ -16,11 +17,13 @@ public sealed class AuditService : IAuditService
 
     private readonly IAuditLogRepository _repository;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly ILogger<AuditService> _logger;
 
-    public AuditService(IAuditLogRepository repository, IUnitOfWork unitOfWork)
+    public AuditService(IAuditLogRepository repository, IUnitOfWork unitOfWork, ILogger<AuditService> logger)
     {
         _repository = repository;
         _unitOfWork = unitOfWork;
+        _logger = logger;
     }
 
     public async Task WriteAsync(
@@ -43,8 +46,34 @@ public sealed class AuditService : IAuditService
             PerformedAt = DateTime.UtcNow
         };
 
-        await _repository.AddAsync(entry, cancellationToken);
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _repository.AddAsync(entry, cancellationToken);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+        }
+        catch (OperationCanceledException ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "Audit write was cancelled. EntityType={EntityType} EntityId={EntityId} Action={Action} PerformedBy={PerformedBy} CancellationRequested={CancellationRequested}",
+                entityType,
+                entityId,
+                action,
+                performedBy,
+                cancellationToken.IsCancellationRequested);
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Audit write failed. EntityType={EntityType} EntityId={EntityId} Action={Action} PerformedBy={PerformedBy}",
+                entityType,
+                entityId,
+                action,
+                performedBy);
+            throw;
+        }
     }
 
     private static string? SerializeSafe(object? value)
