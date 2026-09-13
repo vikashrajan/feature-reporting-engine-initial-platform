@@ -133,6 +133,24 @@ public sealed class JobExecutor : IJobExecutor
             var currentExecutionUtc = DateTime.UtcNow;
             var parameters = await _parameterResolver.ResolveAsync(report.ReportId, currentExecutionUtc, cancellationToken);
 
+            var substitutedQuery = report.QueryText;
+            foreach (var parameter in parameters)
+            {
+                var placeholder = parameter.Key.StartsWith('@') ? parameter.Key : $"@{parameter.Key}";
+                // Basic string replacement for display/logging purposes
+                var val = parameter.Value switch
+                {
+                    DateTime dt => $"'{dt:O}'",
+                    string s => $"'{s.Replace("'", "''")}'",
+                    null => "NULL",
+                    _ => parameter.Value.ToString()
+                };
+                substitutedQuery = substitutedQuery.Replace(placeholder, val, StringComparison.OrdinalIgnoreCase);
+            }
+            execution.ExecutionQuery = substitutedQuery;
+            await _executionRepository.UpdateAsync(execution, cancellationToken);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+
             var dataProvider = _dataSourceProviderResolver.Resolve(report.DataSource.DataSourceType);
             _logger.LogInformation("Executing data source DataSourceId={DataSourceId} Type={DataSourceType}", report.DataSourceId, report.DataSource.DataSourceType);
             var rows = await dataProvider.ExecuteQueryAsync(
