@@ -89,6 +89,7 @@ public sealed record JobExecutionDto(
     int RetryCount,
     string? ErrorCode,
     string? ErrorMessage,
+    string? ExecutionQuery,
     IReadOnlyList<FileExecutionDto> Files);
 
 public sealed record DashboardDto(int RunningReports, int SuccessfulReports, int FailedReports, int UpcomingReports);

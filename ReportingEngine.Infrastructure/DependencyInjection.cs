@@ -186,6 +186,11 @@ public static class DependencyInjection
                     ALTER TABLE RepScdhedularProject_FileConfiguration ADD ZipBatchSize int NULL
                 END
 
+                IF COL_LENGTH('RepScdhedularProject_JobExecution', 'ExecutionQuery') IS NULL
+                BEGIN
+                    ALTER TABLE RepScdhedularProject_JobExecution ADD ExecutionQuery nvarchar(max) NULL
+                END
+
                 IF COL_LENGTH('RepScdhedularProject_FileConfiguration', 'KeepLocalFiles') IS NULL
                 BEGIN
                     ALTER TABLE RepScdhedularProject_FileConfiguration ADD KeepLocalFiles bit NOT NULL CONSTRAINT DF_RepScdhedularProject_FileConfiguration_KeepLocalFiles DEFAULT(1)

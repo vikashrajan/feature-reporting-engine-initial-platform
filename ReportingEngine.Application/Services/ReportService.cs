@@ -282,6 +282,7 @@ internal static class ExecutionMappings
             e.RetryCount,
             e.ErrorCode,
             e.ErrorMessage,
+            e.ExecutionQuery,
             e.Files.Select(f => new FileExecutionDto(
                 f.FileExecutionId,
                 f.SequenceNumber,

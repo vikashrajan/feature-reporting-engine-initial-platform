@@ -58,6 +58,7 @@ public sealed class JobExecutionConfiguration : IEntityTypeConfiguration<JobExec
         builder.Property(x => x.RetryCount).IsRequired().HasDefaultValue(0);
         builder.Property(x => x.ErrorCode).HasMaxLength(100);
         builder.Property(x => x.ErrorMessage).HasColumnType("nvarchar(max)");
+        builder.Property(x => x.ExecutionQuery).HasColumnType("nvarchar(max)");
         builder.Property(x => x.IdempotencyKey).HasMaxLength(200);
         builder.Property(x => x.CreatedDate).IsRequired().HasDefaultValueSql("SYSUTCDATETIME()");
         builder.HasIndex(x => x.IdempotencyKey).IsUnique().HasFilter("[IdempotencyKey] IS NOT NULL");
