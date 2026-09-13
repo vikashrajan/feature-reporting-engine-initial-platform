@@ -1,7 +1,6 @@
 using FluentAssertions;
 using ReportingEngine.Domain.Enums;
 using ReportingEngine.Infrastructure.HangfireJobs;
-using Xunit;
 
 namespace ReportingEngine.Tests;
 

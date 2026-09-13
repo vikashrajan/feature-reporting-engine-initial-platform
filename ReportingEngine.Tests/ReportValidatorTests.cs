@@ -7,7 +7,6 @@ using ReportingEngine.Application.Abstractions.Repositories;
 using ReportingEngine.Domain.Entities;
 using ReportingEngine.Domain.Enums;
 using ReportingEngine.Infrastructure.Execution;
-using Xunit;
 
 namespace ReportingEngine.Tests;
 

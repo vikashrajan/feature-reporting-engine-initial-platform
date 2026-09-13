@@ -1,8 +1,4 @@
-using System.Text.Json;
 using Hangfire;
-using Microsoft.EntityFrameworkCore;
-using ReportingEngine.Application.DTOs;
-using ReportingEngine.Application.Services;
 using ReportingEngine.Infrastructure;
 using Serilog;
 using Serilog.Events;

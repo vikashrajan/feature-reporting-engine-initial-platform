@@ -2,7 +2,6 @@ using FluentAssertions;
 using ReportingEngine.Application.Abstractions.Files;
 using ReportingEngine.Domain.Enums;
 using ReportingEngine.Infrastructure.Files;
-using Xunit;
 
 namespace ReportingEngine.Tests;
 

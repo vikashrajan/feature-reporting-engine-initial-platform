@@ -6,11 +6,9 @@ using ReportingEngine.Application.Abstractions.Data;
 using ReportingEngine.Application.Abstractions.Delivery;
 using ReportingEngine.Application.Abstractions.Files;
 using ReportingEngine.Application.Options;
-using ReportingEngine.Domain.Enums;
 using ReportingEngine.Infrastructure.Data;
 using ReportingEngine.Infrastructure.Delivery;
 using ReportingEngine.Infrastructure.Files;
-using Xunit;
 
 namespace ReportingEngine.Tests;
 

@@ -1,7 +1,7 @@
-using System.Runtime.CompilerServices;
 using Microsoft.Azure.Cosmos;
 using ReportingEngine.Application.Abstractions.Data;
 using ReportingEngine.Domain.Enums;
+using System.Runtime.CompilerServices;
 
 namespace ReportingEngine.Infrastructure.Data;
 

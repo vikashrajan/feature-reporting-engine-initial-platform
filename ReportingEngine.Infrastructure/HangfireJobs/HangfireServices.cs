@@ -1,12 +1,9 @@
 using Hangfire;
 using Hangfire.Common;
 using Hangfire.States;
-using Hangfire.Storage;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using ReportingEngine.Application.Abstractions.Execution;
 using ReportingEngine.Application.Abstractions.Repositories;
-using ReportingEngine.Application.Options;
 using ReportingEngine.Domain.Enums;
 
 namespace ReportingEngine.Infrastructure.HangfireJobs;

@@ -1,6 +1,3 @@
-using System.Net;
-using System.Net.Mail;
-using System.Text;
 using Amazon;
 using Amazon.Runtime;
 using Amazon.S3;
@@ -12,6 +9,8 @@ using Microsoft.Extensions.Options;
 using ReportingEngine.Application.Abstractions.Delivery;
 using ReportingEngine.Application.Options;
 using ReportingEngine.Domain.Enums;
+using System.Net;
+using System.Net.Mail;
 
 namespace ReportingEngine.Infrastructure.Delivery;
 

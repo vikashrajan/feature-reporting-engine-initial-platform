@@ -1,7 +1,7 @@
-using System.IO.Compression;
-using System.Runtime.CompilerServices;
 using ReportingEngine.Application.Abstractions.Files;
 using ReportingEngine.Domain.Enums;
+using System.IO.Compression;
+using System.Runtime.CompilerServices;
 
 namespace ReportingEngine.Infrastructure.Files;
 

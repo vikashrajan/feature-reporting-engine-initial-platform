@@ -1,13 +1,9 @@
-using System;
-using System.IO;
-using System.Net;
-using System.Net.Mail;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using ReportingEngine.Application.DTOs;
 using ReportingEngine.Application.Options;
+using System.Net;
+using System.Net.Mail;
 
 namespace ReportingEngine.Application.Services;
 

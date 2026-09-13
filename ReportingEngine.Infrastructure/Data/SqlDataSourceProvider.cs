@@ -1,10 +1,10 @@
-using System.Data;
-using System.Runtime.CompilerServices;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Options;
 using ReportingEngine.Application.Abstractions.Data;
 using ReportingEngine.Application.Options;
 using ReportingEngine.Domain.Enums;
+using System.Data;
+using System.Runtime.CompilerServices;
 
 namespace ReportingEngine.Infrastructure.Data;
 

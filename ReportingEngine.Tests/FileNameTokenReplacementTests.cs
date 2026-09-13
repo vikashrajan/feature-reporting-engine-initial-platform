@@ -1,7 +1,6 @@
 using FluentAssertions;
 using ReportingEngine.Application.Abstractions.Files;
 using ReportingEngine.Infrastructure.Files;
-using Xunit;
 
 namespace ReportingEngine.Tests;
 
