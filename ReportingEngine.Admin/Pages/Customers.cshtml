@@ -37,6 +37,13 @@
 
 @section Scripts {
 <script>
+const cId = document.getElementById('cId');
+const code = document.getElementById('code');
+const name = document.getElementById('name');
+const tz = document.getElementById('tz');
+const msg = document.getElementById('msg');
+const rows = document.getElementById('rows');
+
 async function load() {
   await loadTimeZones();
   const items = await api.get('/api/customers');
