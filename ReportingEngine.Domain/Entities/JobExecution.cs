@@ -13,6 +13,7 @@ public class JobExecution
     public int RetryCount { get; set; }
     public string? ErrorCode { get; set; }
     public string? ErrorMessage { get; set; }
+    public string? ExecutionQuery { get; set; }
     public string? IdempotencyKey { get; set; }
     public DateTime CreatedDate { get; set; }
 

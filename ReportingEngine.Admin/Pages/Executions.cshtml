@@ -40,6 +40,12 @@
 
 @section Scripts {
 <script>
+const eId = document.getElementById('eId');
+const detail = document.getElementById('detail');
+const reportCombo = document.getElementById('reportCombo');
+const execRows = document.getElementById('execRows');
+const msg = document.getElementById('msg');
+
 async function initReportsCombo() {
   try {
     const reports = await api.get('/api/reports');
