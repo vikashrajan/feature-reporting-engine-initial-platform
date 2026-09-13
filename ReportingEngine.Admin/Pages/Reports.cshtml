@@ -116,31 +116,36 @@ async function initCombos() {
 }
 
 async function load() {
-  await initCombos();
-  const items = await api.get('/api/reports');
+  try {
+    await initCombos();
+    const items = await api.get('/api/reports');
 
-  // Also update history report select dropdown
-  histReportSelect.innerHTML = '<option value="">-- Select Report --</option>' +
-    items.map(r => `<option value="${r.reportId}">${r.reportName} (${r.reportCode})</option>`).join('');
+    // Also update history report select dropdown
+    histReportSelect.innerHTML = '<option value="">-- Select Report --</option>' +
+      items.map(r => `<option value="${r.reportId}">${r.reportName} (${r.reportCode})</option>`).join('');
 
-  rows.innerHTML = items.map(x => `<tr>
-    <td><strong>${x.reportId}</strong></td>
-    <td><code>${x.reportCode}</code></td>
-    <td><strong>${x.reportName}</strong></td>
-    <td>${x.customerName || (customersMap[x.customerId] ? customersMap[x.customerId].customerName : 'ID: ' + x.customerId)}</td>
-    <td>${x.dataSourceName || (dataSourcesMap[x.dataSourceId] ? dataSourcesMap[x.dataSourceId].dataSourceName : 'ID: ' + x.dataSourceId)}</td>
-    <td>${x.scheduleName || (schedulesMap[x.scheduleId] ? schedulesMap[x.scheduleId].scheduleName : 'ID: ' + x.scheduleId)}</td>
-    <td>${x.fileConfigName || (fileConfigsMap[x.fileConfigId] ? fileConfigsMap[x.fileConfigId].configurationName : 'ID: ' + x.fileConfigId)}</td>
-    <td>${x.deliveryConfigName || (deliveryConfigsMap[x.deliveryConfigId] ? deliveryConfigsMap[x.deliveryConfigId].deliveryName : 'ID: ' + x.deliveryConfigId)}</td>
-    <td><span class="badge ${x.status.toLowerCase()}">${x.status}</span></td>
-    <td>
-      <button onclick="act(${x.reportId},'run')">Run Now</button>
-      <button class="secondary" onclick="act(${x.reportId},'activate')">Activate</button>
-      <button class="secondary" onclick="act(${x.reportId},'pause')">Pause</button>
-      <button class="secondary" onclick="act(${x.reportId},'resume')">Resume</button>
-      <button class="secondary" onclick="edit(${x.reportId})">Edit</button>
-      <button class="danger" onclick="deleteReport(${x.reportId}, '${x.reportName.replace(/'/g, "\\'")}')">Delete</button>
-    </td></tr>`).join('');
+    rows.innerHTML = items.map(x => `<tr>
+      <td><strong>${x.reportId}</strong></td>
+      <td><code>${x.reportCode}</code></td>
+      <td><strong>${x.reportName}</strong></td>
+      <td>${x.customerName || (customersMap[x.customerId] ? customersMap[x.customerId].customerName : 'ID: ' + x.customerId)}</td>
+      <td>${x.dataSourceName || (dataSourcesMap[x.dataSourceId] ? dataSourcesMap[x.dataSourceId].dataSourceName : 'ID: ' + x.dataSourceId)}</td>
+      <td>${x.scheduleName || (schedulesMap[x.scheduleId] ? schedulesMap[x.scheduleId].scheduleName : 'ID: ' + x.scheduleId)}</td>
+      <td>${x.fileConfigName || (fileConfigsMap[x.fileConfigId] ? fileConfigsMap[x.fileConfigId].configurationName : 'ID: ' + x.fileConfigId)}</td>
+      <td>${x.deliveryConfigName || (deliveryConfigsMap[x.deliveryConfigId] ? deliveryConfigsMap[x.deliveryConfigId].deliveryName : 'ID: ' + x.deliveryConfigId)}</td>
+      <td><span class="badge ${x.status.toLowerCase()}">${x.status}</span></td>
+      <td>
+        <button onclick="act(${x.reportId},'run')">Run Now</button>
+        <button class="secondary" onclick="act(${x.reportId},'activate')">Activate</button>
+        <button class="secondary" onclick="act(${x.reportId},'pause')">Pause</button>
+        <button class="secondary" onclick="act(${x.reportId},'resume')">Resume</button>
+        <button class="secondary" onclick="edit(${x.reportId})">Edit</button>
+        <button class="danger" onclick="deleteReport(${x.reportId}, '${x.reportName.replace(/'/g, "\\'")}')">Delete</button>
+      </td></tr>`).join('');
+  } catch(e) {
+    rows.innerHTML = '<tr><td colspan="10">Unable to load reports. See the message above.</td></tr>';
+    showMsg(msg, 'Error loading Reports page: ' + e.message, false);
+  }
 }
 
 function parseParams() { 
@@ -223,19 +228,21 @@ async function act(id, action) {
 }
 
 async function edit(id) {
-  const x = await api.get('/api/reports/' + id);
-  rId.value = x.reportId; 
-  rCustomer.value = x.customerId; 
-  rCode.value = x.reportCode; 
-  rName.value = x.reportName;
-  rDs.value = x.dataSourceId; 
-  rSched.value = x.scheduleId; 
-  rFile.value = x.fileConfigId; 
-  rDel.value = x.deliveryConfigId;
-  rQuery.value = x.queryText; 
-  rParams.value = JSON.stringify(x.parameters, null, 2); 
-  histReportSelect.value = id;
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  try {
+    const x = await api.get('/api/reports/' + id);
+    rId.value = x.reportId; 
+    rCustomer.value = x.customerId; 
+    rCode.value = x.reportCode; 
+    rName.value = x.reportName;
+    rDs.value = x.dataSourceId; 
+    rSched.value = x.scheduleId; 
+    rFile.value = x.fileConfigId; 
+    rDel.value = x.deliveryConfigId;
+    rQuery.value = x.queryText; 
+    rParams.value = JSON.stringify(x.parameters, null, 2); 
+    histReportSelect.value = id;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  } catch(e) { showMsg(msg, e.message, false); }
 }
 
 async function deleteReport(id, label) {
@@ -262,25 +269,30 @@ function resetForm() {
 }
 
 async function loadHistory() {
-  const id = histReportSelect.value;
-  if (!id) {
-    showMsg(msg, 'Please select a report from the dropdown to load execution history.', false);
-    return;
+  try {
+    const id = histReportSelect.value;
+    if (!id) {
+      showMsg(msg, 'Please select a report from the dropdown to load execution history.', false);
+      return;
+    }
+    const items = await api.get('/api/reports/' + id + '/executions');
+    if (items.length === 0) {
+      hist.innerHTML = '<tr><td colspan="7">No execution history found for this report.</td></tr>';
+      return;
+    }
+    hist.innerHTML = items.map(x => `<tr>
+      <td><strong>#${x.executionId}</strong></td>
+      <td><span class="badge ${x.status.toLowerCase()}">${x.status}</span></td>
+      <td>${x.startedAt ? new Date(x.startedAt).toLocaleString() : '-'}</td>
+      <td>${x.completedAt ? new Date(x.completedAt).toLocaleString() : '-'}</td>
+      <td>${x.recordCount ?? '-'}</td>
+      <td>${x.fileCount ?? '-'}</td>
+      <td>${x.errorMessage ? `<span style="color:var(--danger);">${x.errorMessage}</span>` : 'None'}</td>
+    </tr>`).join('');
+  } catch(e) {
+    hist.innerHTML = '<tr><td colspan="7">Unable to load execution history. See the message above.</td></tr>';
+    showMsg(msg, e.message, false);
   }
-  const items = await api.get('/api/reports/' + id + '/executions');
-  if (items.length === 0) {
-    hist.innerHTML = '<tr><td colspan="7">No execution history found for this report.</td></tr>';
-    return;
-  }
-  hist.innerHTML = items.map(x => `<tr>
-    <td><strong>#${x.executionId}</strong></td>
-    <td><span class="badge ${x.status.toLowerCase()}">${x.status}</span></td>
-    <td>${x.startedAt ? new Date(x.startedAt).toLocaleString() : '-'}</td>
-    <td>${x.completedAt ? new Date(x.completedAt).toLocaleString() : '-'}</td>
-    <td>${x.recordCount ?? '-'}</td>
-    <td>${x.fileCount ?? '-'}</td>
-    <td>${x.errorMessage ? `<span style="color:var(--danger);">${x.errorMessage}</span>` : 'None'}</td>
-  </tr>`).join('');
 }
 
 load();

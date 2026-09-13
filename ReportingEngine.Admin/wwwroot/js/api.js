@@ -19,6 +19,7 @@ window.api = {
 
 async function readError(res) {
   const text = await res.text();
+  const prefix = `HTTP ${res.status}${res.statusText ? ' ' + res.statusText : ''}`;
   try {
     const problem = JSON.parse(text);
     if (problem.errors) {
@@ -27,11 +28,13 @@ async function readError(res) {
         const cleanField = field.replace(/^\$\./, '');
         messages.push(`${cleanField}: ${Array.isArray(errors) ? errors.join(', ') : errors}`);
       }
-      if (messages.length) return messages.join(' | ');
+      if (messages.length) return `${prefix}: ${messages.join(' | ')}`;
     }
-    return problem.detail || problem.title || text;
+    const detail = problem.detail || problem.title || text;
+    const trace = problem.traceId || problem.instance;
+    return `${prefix}: ${detail}${trace ? ' Trace: ' + trace : ''}`;
   } catch {
-    return text;
+    return `${prefix}: ${text || 'Request failed.'}`;
   }
 }
 
